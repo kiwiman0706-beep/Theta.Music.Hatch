@@ -247,7 +247,8 @@ class _ArtPanelState extends State<_ArtPanel> {
 class ArtImage extends StatefulWidget {
   final ArtRef? ref;
   final BoxFit fit;
-  const ArtImage(this.ref, {super.key, this.fit = BoxFit.cover});
+  final Widget? placeholder; // 画像が無いとき（スキンごとに変える）
+  const ArtImage(this.ref, {super.key, this.fit = BoxFit.cover, this.placeholder});
   @override
   State<ArtImage> createState() => _ArtImageState();
 }
@@ -284,6 +285,7 @@ class _ArtImageState extends State<ArtImage> {
   @override
   Widget build(BuildContext context) {
     if (_data == null) {
+      if (widget.placeholder != null) return widget.placeholder!;
       return Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(

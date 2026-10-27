@@ -6,13 +6,15 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'dsaudio.dart';
 import 'models.dart';
 import 'settings.dart';
 
 /// アルバムアートを NAS から取得し、端末内にキャッシュする
 class ArtCache {
   final AppSettings settings;
-  ArtCache(this.settings);
+  final DsAudioClient ds;
+  ArtCache(this.settings, this.ds);
 
   final Map<String, Uint8List?> _mem = {};
   final Map<String, Future<Uint8List?>> _inflight = {};
@@ -41,6 +43,9 @@ class ArtCache {
       final f = await fileFor(ref);
       if (await f.exists()) {
         data = await f.readAsBytes();
+      } else if (ref.path.startsWith('ds:')) {
+        data = await ds.cover(ref.path.substring(3));
+        if (data != null) await f.writeAsBytes(data);
       } else {
         final dav = settings.client();
         try {

@@ -5,6 +5,9 @@ import 'webdav.dart';
 
 enum RepeatSetting { off, one, all }
 
+/// 曲の取得元。webdav: NAS のフォルダを直接スキャン / dsaudio: Synology Audio Station の API
+enum MusicSource { webdav, dsaudio }
+
 class AppSettings extends ChangeNotifier {
   late SharedPreferences _p;
 
@@ -19,6 +22,17 @@ class AppSettings extends ChangeNotifier {
   bool shuffle = false;
   RepeatSetting repeat = RepeatSetting.off;
 
+  MusicSource source = MusicSource.webdav;
+  String dsUrl = ''; // 例: http://nas.tailXXXX.ts.net:5000
+  String dsDid = ''; // 2 段階認証のデバイストークン
+  bool dsTranscode = false; // Audio Station で MP3 に変換して受け取る（回線が細いとき・非対応形式）
+
+  /// 見た目: ipod（クリックホイール） / theta（ThetaHomeHatch の HUD）
+  String skin = 'ipod';
+
+  /// theta スキンのテーマ: dark / light / pop / alert / scifi / system
+  String hudTheme = 'dark';
+
   Future<void> load() async {
     _p = await SharedPreferences.getInstance();
     serverUrl = _p.getString('serverUrl') ?? '';
@@ -31,9 +45,15 @@ class AppSettings extends ChangeNotifier {
     blackBody = _p.getBool('blackBody') ?? false;
     shuffle = _p.getBool('shuffle') ?? false;
     repeat = RepeatSetting.values[(_p.getInt('repeat') ?? 0).clamp(0, 2)];
+    source = MusicSource.values[(_p.getInt('source') ?? 0).clamp(0, 1)];
+    dsUrl = _p.getString('dsUrl') ?? '';
+    dsDid = _p.getString('dsDid') ?? '';
+    dsTranscode = _p.getBool('dsTranscode') ?? false;
+    skin = _p.getString('skin') ?? 'ipod';
+    hudTheme = _p.getString('hudTheme') ?? 'dark';
   }
 
-  bool get configured => serverUrl.isNotEmpty;
+  bool get configured => source == MusicSource.dsaudio ? dsUrl.isNotEmpty : serverUrl.isNotEmpty;
 
   WebDavClient client() => WebDavClient(serverUrl, user, password);
 
@@ -48,6 +68,12 @@ class AppSettings extends ChangeNotifier {
     await _p.setBool('blackBody', blackBody);
     await _p.setBool('shuffle', shuffle);
     await _p.setInt('repeat', repeat.index);
+    await _p.setInt('source', source.index);
+    await _p.setString('dsUrl', dsUrl);
+    await _p.setString('dsDid', dsDid);
+    await _p.setBool('dsTranscode', dsTranscode);
+    await _p.setString('skin', skin);
+    await _p.setString('hudTheme', hudTheme);
     notifyListeners();
   }
 }

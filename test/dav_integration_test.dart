@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:theta_music/core/dsaudio.dart';
 import 'package:theta_music/core/library.dart';
 import 'package:theta_music/core/obsidian.dart';
 import 'package:theta_music/core/scanner.dart';
@@ -22,7 +23,7 @@ void main() {
     final settings = AppSettings();
     await settings.load();
     final lib = Library()..dirOverride = await Directory.systemTemp.createTemp('lib');
-    final scanner = Scanner(settings, lib);
+    final scanner = Scanner(settings, lib, DsAudioClient(settings));
     await scanner.scan();
     expect(scanner.error, isNull, reason: scanner.status);
     for (final t in lib.tracks) {
@@ -35,7 +36,7 @@ void main() {
     await scanner.scan();
     expect(scanner.tagsTotal, 0);
 
-    final ex = ObsidianExporter(settings, lib);
+    final ex = ObsidianExporter(settings, lib, settings.client);
     await ex.export();
     // ignore: avoid_print
     print(ex.status);

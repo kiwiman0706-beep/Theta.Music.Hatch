@@ -15,6 +15,8 @@ class Track {
   final String? artPath;
   final int artOffset;
   final int artLength;
+  // Audio Station の曲 ID（DS audio 経由のときだけ）
+  final String id;
 
   const Track({
     required this.path,
@@ -31,6 +33,7 @@ class Track {
     this.artPath,
     this.artOffset = 0,
     this.artLength = 0,
+    this.id = '',
   });
 
   String get displayArtist => artist.isNotEmpty ? artist : 'Unknown Artist';
@@ -43,23 +46,6 @@ class Track {
   ArtRef? get art => artPath == null
       ? null
       : ArtRef(artPath!, offset: artOffset, length: artLength);
-
-  Track copyWith({String? artPath, int? artOffset, int? artLength}) => Track(
-        path: path,
-        size: size,
-        mtime: mtime,
-        title: title,
-        artist: artist,
-        albumArtist: albumArtist,
-        album: album,
-        genre: genre,
-        year: year,
-        trackNo: trackNo,
-        discNo: discNo,
-        artPath: artPath ?? this.artPath,
-        artOffset: artOffset ?? this.artOffset,
-        artLength: artLength ?? this.artLength,
-      );
 
   Map<String, dynamic> toJson() => {
         'p': path,
@@ -76,6 +62,7 @@ class Track {
         if (artPath != null) 'ap': artPath,
         if (artLength != 0) 'ao': artOffset,
         if (artLength != 0) 'alen': artLength,
+        if (id.isNotEmpty) 'i': id,
       };
 
   factory Track.fromJson(Map<String, dynamic> j) => Track(
@@ -93,10 +80,12 @@ class Track {
         artPath: j['ap'] as String?,
         artOffset: j['ao'] as int? ?? 0,
         artLength: j['alen'] as int? ?? 0,
+        id: j['i'] as String? ?? '',
       );
 }
 
 /// 画像の参照。length > 0 のときはファイル内の埋め込み画像（Range取得）。
+/// path が `ds:` で始まるときは Audio Station のカバー（`ds:<曲ID>`）。
 class ArtRef {
   final String path;
   final int offset;

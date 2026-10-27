@@ -217,8 +217,13 @@ MenuScreen settingsMenu() {
   return MenuScreen(
     'Settings',
     () => [
-      MenuItem('Server', detail: s.configured ? Uri.tryParse(s.serverUrl)?.host ?? '' : '未設定', chevron: true,
+      MenuItem('Source', detail: s.source == MusicSource.dsaudio ? 'DS audio' : 'WebDAV', chevron: true,
           onSelect: () => showServerDialog(nav.context)),
+      MenuItem('Skin', detail: 'iPod', onSelect: () {
+        // ThetaHomeHatch 風の画面へ
+        s.skin = 'theta';
+        save();
+      }),
       MenuItem('Shuffle', detail: s.shuffle ? 'Songs' : 'Off', onSelect: () {
         s.shuffle = !s.shuffle;
         save();

@@ -6,6 +6,8 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart';
 
+import 'note_store.dart';
+
 class DavEntry {
   final String path; // デコード済み絶対パス（末尾スラッシュなし）
   final bool isDir;
@@ -23,7 +25,7 @@ class DavException implements Exception {
 }
 
 /// 最小限の WebDAV クライアント（Synology の WebDAV Server パッケージ想定）。
-class WebDavClient {
+class WebDavClient implements NoteStore {
   final Uri base; // 例: http://nas.tailxxxx.ts.net:5005
   final String user;
   final String password;
@@ -152,7 +154,7 @@ class WebDavClient {
     return res.bodyBytes;
   }
 
-  /// 存在しなければ null
+  @override
   Future<String?> getText(String path) async {
     final res = await _client.get(uriFor(path), headers: authHeaders).timeout(const Duration(seconds: 30));
     if (res.statusCode == 404) return null;
@@ -160,6 +162,7 @@ class WebDavClient {
     return utf8.decode(res.bodyBytes, allowMalformed: true);
   }
 
+  @override
   Future<void> putText(String path, String text) async {
     final res = await _client
         .put(uriFor(path),
@@ -170,6 +173,7 @@ class WebDavClient {
   }
 
   /// フォルダを（親から順に）作成。既存なら何もしない。
+  @override
   Future<void> mkdirs(String path) async {
     final segs = path.split('/').where((s) => s.isNotEmpty).toList();
     var cur = '';
@@ -185,5 +189,6 @@ class WebDavClient {
     }
   }
 
+  @override
   void close() => _client.close();
 }

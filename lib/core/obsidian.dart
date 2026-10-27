@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import 'library.dart';
 import 'models.dart';
+import 'note_store.dart';
 import 'scanner.dart' show pool;
 import 'settings.dart';
 
@@ -26,7 +27,8 @@ String _artistNote(String name) => 'Artists/${safeName(name)}';
 class ObsidianExporter extends ChangeNotifier {
   final AppSettings settings;
   final Library library;
-  ObsidianExporter(this.settings, this.library);
+  final NoteStore Function() store; // WebDAV か File Station
+  ObsidianExporter(this.settings, this.library, this.store);
 
   bool running = false;
   int done = 0;
@@ -112,7 +114,7 @@ class ObsidianExporter extends ChangeNotifier {
 
     total = notes.length;
     notifyListeners();
-    final dav = settings.client();
+    final dav = store();
     var errors = 0;
     try {
       await dav.mkdirs('$base/Albums');

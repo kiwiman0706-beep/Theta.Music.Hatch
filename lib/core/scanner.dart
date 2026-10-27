@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import 'dsaudio.dart';
 import 'library.dart';
 import 'models.dart';
 import 'settings.dart';
@@ -37,7 +38,8 @@ Future<void> pool<T>(Iterable<T> items, int n, Future<void> Function(T) f, bool 
 class Scanner extends ChangeNotifier {
   final AppSettings settings;
   final Library library;
-  Scanner(this.settings, this.library);
+  final DsAudioClient ds;
+  Scanner(this.settings, this.library, this.ds);
 
   bool running = false;
   bool _cancel = false;
@@ -58,6 +60,7 @@ class Scanner extends ChangeNotifier {
     error = null;
     status = 'フォルダを探索中…';
     notifyListeners();
+    if (settings.source == MusicSource.dsaudio) return _scanDs();
     final dav = settings.client();
     try {
       final root = _normRoot(settings.musicPath);
@@ -156,6 +159,68 @@ class Scanner extends ChangeNotifier {
       running = false;
       notifyListeners();
     }
+  }
+
+  /// Audio Station のライブラリを丸ごと取り込む（インデックスは NAS 側が作ったものを使う）
+  Future<void> _scanDs() async {
+    try {
+      status = 'Audio Station から取得中…';
+      notifyListeners();
+      final songs = await ds.listSongs(
+        progress: (d, t) {
+          tagsDone = d;
+          tagsTotal = t;
+          files = d;
+          notifyListeners();
+        },
+        cancelled: () => _cancel,
+      );
+      if (_cancel) throw _Cancelled();
+      final root = commonRoot([for (final s in songs) s.path]);
+      final tracks = <Track>[];
+      for (final s in songs) {
+        // タグが空の項目は WebDAV のときと同じくフォルダ構成から補う
+        final tag = TagInfo()
+          ..title = s.title
+          ..artist = s.artist
+          ..albumArtist = s.albumArtist
+          ..album = s.album
+          ..genre = s.genre
+          ..year = s.year
+          ..trackNo = s.track
+          ..discNo = s.disc;
+        final path = s.path.isEmpty ? '/${s.id}' : s.path;
+        final t = _makeTrack(DavEntry(path, false, s.size, 0), root == '/' ? '' : root, tag);
+        tracks.add(Track.fromJson({...t.toJson(), 'ap': 'ds:${s.id}', 'i': s.id}));
+      }
+      await library.replace(tracks, root);
+      status = '完了: ${tracks.length} 曲（Audio Station）';
+    } on _Cancelled {
+      status = 'キャンセルしました';
+    } catch (e) {
+      error = '$e';
+      status = 'エラー: $e';
+    } finally {
+      running = false;
+      notifyListeners();
+    }
+  }
+
+  /// パスの共通のフォルダ（Folders 表示の起点）
+  static String commonRoot(List<String> paths) {
+    if (paths.isEmpty) return '/';
+    var parts = paths.first.split('/')..removeLast();
+    for (final p in paths.skip(1)) {
+      final q = p.split('/');
+      var i = 0;
+      while (i < parts.length && i < q.length - 1 && parts[i] == q[i]) {
+        i++;
+      }
+      parts = parts.sublist(0, i);
+      if (parts.length <= 1) break;
+    }
+    final r = parts.join('/');
+    return r.isEmpty ? '/' : r;
   }
 
   static String _normRoot(String p) {

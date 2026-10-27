@@ -1,6 +1,7 @@
 # Theta Music
 
-Tailscale 経由で NAS の Music フォルダを直接再生する、iPod classic 風 UI の Android 音楽プレーヤー（Flutter）。
+Tailscale 経由で NAS の音楽を再生する Android 音楽プレーヤー（Flutter）。
+見た目は **iPod classic 風（クリックホイール）** と **ThetaHomeHatch 風（HUD・右端の縦タブ）** を切り替えられます。
 
 ## 仕組み
 
@@ -10,8 +11,12 @@ Tailscale 経由で NAS の Music フォルダを直接再生する、iPod class
                                        └─ /music/Artist/Album/*.flac ...
 ```
 
-- **接続**: NAS の WebDAV（Synology なら「WebDAV Server」パッケージ、HTTP 5005 / HTTPS 5006）。
-  Tailscale がトンネルを暗号化するので HTTP でも通信内容は保護されます。
+- **接続**（設定で切り替え）
+  - **WebDAV**: NAS のフォルダを直接スキャン（Synology なら「WebDAV Server」パッケージ、HTTP 5005）。Audio Station 不要
+  - **DS audio**: Synology Audio Station の Web API（DS audio と同じ `SYNO.AudioStation.*`）で曲の一覧・再生・カバーを取得。
+    スキャン不要で、タグは NAS 側のもの。ログインは ThetaHomeHatch と同じ手順（`SYNO.API.Info` → `SYNO.API.Auth`、
+    2 段階認証は初回だけコード入力 → デバイストークンで次から不要）。必要なら MP3 に変換して受け取れます
+  - Tailscale がトンネルを暗号化するので HTTP でも通信内容は保護されます
 - **再生**: just_audio (ExoPlayer) で NAS から直接ストリーミング。バックグラウンド再生・ロック画面操作対応。
   通信が切れた場合は同じ位置から最大 3 回自動で再接続。
 - **ライブラリ**: アプリ内で独自スキャン → 端末内 `library.json` にキャッシュ。
@@ -21,12 +26,22 @@ Tailscale 経由で NAS の Music フォルダを直接再生する、iPod class
   - アート: 埋め込み画像（Range 取得）か `cover.jpg` / `folder.jpg` 等
   - 2 回目以降は**差分スキャン**（サイズ・更新日時が変わったファイルだけ読み直し）
 - **Obsidian 連携**: Library → Export to Obsidian で、NAS 上の Vault フォルダに Markdown を書き出し
+  （WebDAV のときは WebDAV、DS audio のときは File Station API で書き込み）
   - `Albums/<Artist> - <Album>.md`（frontmatter: artist/album/year/genre/tracks + 曲リスト表）
   - `Artists/<Artist>.md`（アルバムへの `[[wikilink]]`）
   - `Music Library.md`（Dataview クエリ付きインデックス）
   - 再書き出ししても、自動生成区間の外に書いたメモや frontmatter に追加した独自キー（`rating:` など）は保持
 
-## 操作（クリックホイール）
+## 見た目（スキン）
+
+| スキン | 内容 |
+|---|---|
+| iPod | 上に液晶、下にクリックホイール。Settings → Skin で切り替え |
+| Theta | ThetaHomeHatch と同じ HUD：黒地にオレンジ、細い線、角を落としたボタン、`[ CODE ]` の見出しと四隅のかぎ括弧、右端に縦書きのタブ（NOW / ARTISTS / ALBUMS / SONGS / GENRES / FOLDERS / LIBRARY・SETUP）。テーマは DARK / LIGHT / POP / ALERT / SCI-FI / SYSTEM（配色は ThetaHomeHatch の `Theme.kt` と同じ値）。SETUP → SKIN で切り替え |
+
+Theta スキンの書体 Oswald・Share Tech Mono は SIL Open Font License（`docs/licenses`）。
+
+## 操作（iPod スキンのクリックホイール）
 
 | 操作 | 動作 |
 |---|---|
@@ -40,13 +55,14 @@ Tailscale 経由で NAS の Music フォルダを直接再生する、iPod class
 
 ## セットアップ
 
-1. NAS: WebDAV を有効化（Synology: パッケージセンター → WebDAV Server → HTTP 5005 を有効）
+1. NAS: WebDAV を有効化（Synology: パッケージセンター → WebDAV Server → HTTP 5005）
+   または Audio Station が動いていれば DS audio 方式でそのまま使えます
 2. スマホ: Tailscale アプリで VPN を ON
-3. APK をインストールして起動 → サーバー設定
-   - URL: `http://<NASのTailscale IP または MagicDNS名>:5005`
-   - Music フォルダ: `/music`（共有フォルダ名）
+3. APK をインストールして起動 → 接続先を設定
+   - WebDAV: URL `http://<NASのTailscale IP または MagicDNS名>:5005`、Music フォルダ `/music`
+   - DS audio: URL `http://<同上>:5000`（ポート省略可）、2 段階認証を使っていれば初回だけコード
    - 「接続テスト」で OK を確認
-4. Library → Update Library でスキャン
+4. ライブラリを更新（iPod: Library → Update Library / Theta: LIBRARY → UPDATE）
 
 ## ビルド
 
@@ -71,7 +87,14 @@ keyPassword=...
 ## 結合テスト（任意）
 
 ```bash
-pip install wsgidav cheroot
-# /music と /vault を公開する WebDAV を立ててから
+pip install wsgidav cheroot mutagen
+# WebDAV: /music と /vault を公開する WebDAV を立ててから
 DAV_URL=http://127.0.0.1:8765 DAV_USER=u DAV_PASS=p flutter test test/dav_integration_test.dart
+
+# DS audio: 実際の NAS か、DSM の API を真似たテストサーバー（test/fake_dsm.py、--otp で 2 段階認証あり）
+python3 test/fake_dsm.py <音楽フォルダ> <書き出し先フォルダ> 5000 --otp &
+DS_URL=127.0.0.1:5000 DS_USER=u DS_PASS=p DS_VAULT=/vault/Music DS_OTP=123456 \
+  flutter test test/ds_integration_test.dart
 ```
+
+`fake_dsm.py` は応答の形を DSM に合わせたものなので、実機の Audio Station と細部が違う可能性があります。

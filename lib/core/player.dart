@@ -6,6 +6,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 
 import 'art_cache.dart';
+import 'dsaudio.dart';
 import 'models.dart';
 import 'settings.dart';
 
@@ -14,6 +15,7 @@ import 'settings.dart';
 class Player extends ChangeNotifier {
   final AppSettings settings;
   final ArtCache art;
+  final DsAudioClient ds;
   // Android ではヘッダーを ExoPlayer に直接渡す（ローカルプロキシを使わない）
   final AudioPlayer audio = AudioPlayer(useProxyForRequestHeaders: false);
 
@@ -23,7 +25,7 @@ class Player extends ChangeNotifier {
   int _retries = 0;
   double volume = 1.0;
 
-  Player(this.settings, this.art) {
+  Player(this.settings, this.art, this.ds) {
     audio.currentIndexStream.listen((i) {
       if (i != null && i != index) {
         index = i;
@@ -50,10 +52,20 @@ class Player extends ChangeNotifier {
   }
 
   Future<AudioSource> _source(Track t) async {
-    final dav = settings.client();
-    final uri = dav.uriFor(t.path);
-    final headers = dav.authHeaders;
-    dav.close();
+    Uri uri;
+    Map<String, String> headers;
+    if (t.id.isNotEmpty) {
+      // Audio Station: セッション ID を URL に含める
+      final name = t.path.substring(t.path.lastIndexOf('/') + 1);
+      final ext = name.contains('.') ? name.substring(name.lastIndexOf('.') + 1).toLowerCase() : '';
+      uri = await ds.streamUri(t.id, ext);
+      headers = const {};
+    } else {
+      final dav = settings.client();
+      uri = dav.uriFor(t.path);
+      headers = dav.authHeaders;
+      dav.close();
+    }
     return AudioSource.uri(uri,
         headers: headers,
         tag: MediaItem(
@@ -104,6 +116,7 @@ class Player extends ChangeNotifier {
     notifyListeners();
     if (queue.isEmpty || _retries >= 3) return;
     _retries++;
+    if (current?.id.isNotEmpty ?? false) ds.reset(); // セッション切れかもしれないのでログインし直す
     final pos = audio.position;
     final i = index;
     Future<void>.delayed(Duration(seconds: 2 * _retries), () => _load(i, pos, play: true));
@@ -120,6 +133,12 @@ class Player extends ChangeNotifier {
         unawaited(audio.play());
       }
     }
+  }
+
+  Future<void> jumpTo(int i) async {
+    if (i < 0 || i >= queue.length) return;
+    await audio.seek(Duration.zero, index: i);
+    if (!audio.playing) unawaited(audio.play());
   }
 
   Future<void> next() async {
