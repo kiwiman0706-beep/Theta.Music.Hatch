@@ -54,6 +54,7 @@ for root, _, files in os.walk(MUSIC):
                              'genre': tag('genre'), 'year': num('date'), 'track': num('tracknumber'),
                              'disc': num('discnumber'), 'composer': '', 'comment': ''},
                 'song_audio': {'filesize': os.path.getsize(full), 'duration': int(m.info.length), 'bitrate': 0},
+                'song_rating': {'rating': 0},
             },
             '_file': full,
         })
@@ -125,6 +126,12 @@ class H(BaseHTTPRequestHandler):
             return self.ok({'sid': SID})
         if q.get('_sid') != SID:
             return self.err(119)
+        if api == 'SYNO.AudioStation.Song' and q.get('method') == 'setrating':
+            s = next((s for s in SONGS if s['id'] == q.get('id')), None)
+            if s is None:
+                return self.err(400)
+            s['additional']['song_rating']['rating'] = int(q.get('rating', 0))
+            return self.ok({})
         if api == 'SYNO.AudioStation.Song':
             off, lim = int(q.get('offset', 0)), int(q.get('limit', 1000))
             songs = [{k: v for k, v in s.items() if k != '_file'} for s in SONGS[off:off + lim]]

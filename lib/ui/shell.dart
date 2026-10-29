@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app.dart';
+import '../core/clicker.dart';
 import 'click_wheel.dart';
 import 'dialogs.dart';
 import 'ipod_theme.dart';
@@ -31,12 +32,22 @@ class _IPodShellState extends State<IPodShell> implements Nav {
     _pushInternal(mainMenu());
     services.settings.addListener(_onChange);
     services.player.addListener(_onChange);
+    services.favorites.addListener(_onFavorites);
+    Clicker.prepare();
     if (!services.settings.configured) {
       WidgetsBinding.instance.addPostFrameCallback((_) => showServerDialog(context));
     }
   }
 
   void _onChange() => setState(() {});
+
+  /// DS audio の★評価を保存できなかったとき
+  void _onFavorites() {
+    final e = services.favorites.syncError;
+    if (e == null) return;
+    services.favorites.syncError = null;
+    toast(e);
+  }
 
   IPodScreen get _top => _stack.last;
 
@@ -91,10 +102,10 @@ class _IPodShellState extends State<IPodShell> implements Nav {
     });
   }
 
+  /// ホイールを回したとき：カリカリ音と振動（それぞれ設定でオン・オフ）
   void _click() {
-    if (!services.settings.clicker) return;
-    HapticFeedback.selectionClick();
-    SystemSound.play(SystemSoundType.click);
+    if (services.settings.haptics) HapticFeedback.selectionClick();
+    if (services.settings.clicker) Clicker.click();
   }
 
   void _onTick(int dir) {
@@ -103,7 +114,8 @@ class _IPodShellState extends State<IPodShell> implements Nav {
   }
 
   void _onButton(WheelButton b) {
-    HapticFeedback.lightImpact();
+    if (services.settings.haptics) HapticFeedback.lightImpact();
+    if (services.settings.clicker) Clicker.click(volume: 0.8);
     switch (b) {
       case WheelButton.menu:
         pop();
@@ -120,7 +132,7 @@ class _IPodShellState extends State<IPodShell> implements Nav {
 
   void _holdStart(WheelButton b) {
     if (b == WheelButton.select || b == WheelButton.menu) {
-      HapticFeedback.heavyImpact();
+      if (services.settings.haptics) HapticFeedback.heavyImpact();
       if (b == WheelButton.select) {
         _top.onLongSelect();
       } else {
@@ -143,6 +155,7 @@ class _IPodShellState extends State<IPodShell> implements Nav {
   void dispose() {
     _seekTimer?.cancel();
     _toastTimer?.cancel();
+    services.favorites.removeListener(_onFavorites);
     services.settings.removeListener(_onChange);
     services.player.removeListener(_onChange);
     super.dispose();

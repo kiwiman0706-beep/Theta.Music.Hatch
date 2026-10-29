@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:theta_music/core/dsaudio.dart';
+import 'package:theta_music/core/favorites.dart';
 import 'package:theta_music/core/library.dart';
 import 'package:theta_music/core/obsidian.dart';
 import 'package:theta_music/core/scanner.dart';
@@ -49,6 +50,22 @@ void main() {
     final cover = await ds.cover(t.id);
     // ignore: avoid_print
     print('cover: ${cover?.length ?? 'none'} bytes');
+
+    // お気に入り = DS audio の★評価（★4以上）。登録で★5 を NAS に書き、更新後も残る
+    final fav = Favorites(lib, favRating: () => settings.dsFavRating, setRating: ds.setRating)
+      ..dirOverride = await Directory.systemTemp.createTemp('fav');
+    expect(fav.isTrack(t), isFalse);
+    expect(fav.toggleTrack(t), isTrue);
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    expect(fav.syncError, isNull);
+    await scanner.scan();
+    final again = lib.tracks.firstWhere((x) => x.id == t.id);
+    expect(again.rating, 5);
+    expect(fav.isTrack(again), isTrue);
+    expect(fav.toggleTrack(again), isFalse);
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    await scanner.scan();
+    expect(lib.tracks.firstWhere((x) => x.id == t.id).rating, 0);
 
     final ex = ObsidianExporter(settings, lib, () => ds);
     await ex.export();

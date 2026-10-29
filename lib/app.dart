@@ -27,7 +27,7 @@ class Services {
     await library.load();
     final ds = DsAudioClient(settings);
     final art = ArtCache(settings, ds);
-    final favorites = Favorites(library);
+    final favorites = Favorites(library, favRating: () => settings.dsFavRating, setRating: ds.setRating);
     await favorites.load();
     return Services._(
       settings,

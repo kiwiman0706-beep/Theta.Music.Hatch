@@ -191,7 +191,7 @@ class Scanner extends ChangeNotifier {
           ..discNo = s.disc;
         final path = s.path.isEmpty ? '/${s.id}' : s.path;
         final t = _makeTrack(DavEntry(path, false, s.size, 0), root == '/' ? '' : root, tag);
-        tracks.add(Track.fromJson({...t.toJson(), 'ap': 'ds:${s.id}', 'i': s.id}));
+        tracks.add(Track.fromJson({...t.toJson(), 'ap': 'ds:${s.id}', 'i': s.id, 'r': s.rating}));
       }
       await library.replace(tracks, root);
       status = '完了: ${tracks.length} 曲（Audio Station）';

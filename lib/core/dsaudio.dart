@@ -24,8 +24,9 @@ class DsOtpException extends DsException {
 class DsSong {
   final String id, path, title, artist, albumArtist, album, genre;
   final int year, track, disc, size;
+  final int rating; // Audio Station / DS audio の評価（0〜5）
   DsSong(this.id, this.path, this.title, this.artist, this.albumArtist, this.album, this.genre, this.year,
-      this.track, this.disc, this.size);
+      this.track, this.disc, this.size, [this.rating = 0]);
 }
 
 /// Synology Audio Station（DS audio と同じ Web API）のクライアント。
@@ -195,7 +196,7 @@ class DsAudioClient implements NoteStore {
         'library': 'all',
         'offset': '$offset',
         'limit': '$page',
-        'additional': 'song_tag,song_audio',
+        'additional': 'song_tag,song_audio,song_rating',
         'sort_by': 'title',
         'sort_direction': 'ASC',
       }, version: 3);
@@ -205,6 +206,7 @@ class DsAudioClient implements NoteStore {
         final add = (s['additional'] as Map<String, dynamic>?) ?? const {};
         final tag = (add['song_tag'] as Map<String, dynamic>?) ?? const {};
         final audio = (add['song_audio'] as Map<String, dynamic>?) ?? const {};
+        final rating = (add['song_rating'] as Map<String, dynamic>?) ?? const {};
         int n(Object? v) => v is int ? v : int.tryParse('${v ?? ''}') ?? 0;
         String t(Object? v) => (v ?? '').toString().trim();
         out.add(DsSong(
@@ -219,12 +221,18 @@ class DsAudioClient implements NoteStore {
           n(tag['track']),
           n(tag['disc']),
           n(audio['filesize']),
+          n(rating['rating']),
         ));
       }
       progress?.call(out.length, total);
       if (songs.isEmpty) break;
     }
     return out;
+  }
+
+  /// 曲の評価（0〜5）を設定。DS audio・Audio Station の★評価と同じもの
+  Future<void> setRating(String id, int rating) async {
+    await call('SYNO.AudioStation.Song', 'setrating', {'id': id, 'rating': '${rating.clamp(0, 5)}'}, version: 3);
   }
 
   /// 再生用の URL（セッション ID を含む）

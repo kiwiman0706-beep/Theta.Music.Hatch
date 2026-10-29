@@ -2,20 +2,49 @@ package com.thetahatch.theta_music
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.media.AudioAttributes
+import android.media.SoundPool
 import android.speech.RecognizerIntent
+import java.io.File
+import java.io.FileOutputStream
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import kotlin.math.PI
+import kotlin.math.exp
+import kotlin.math.sin
+import kotlin.random.Random
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 /**
- * バックグラウンド再生（audio_service）の Activity に、音声入力の呼び出しを足したもの。
+ * バックグラウンド再生（audio_service）の Activity に、音声入力とクリック音を足したもの。
  * 音声入力は端末の音声入力アプリ（Google）に任せるので、このアプリにマイクの権限は要らない。
+ * クリック音（iPod のカリカリ）は SoundPool で鳴らす。効果音なので再生中の音楽は止めない。
  */
 class MainActivity : AudioServiceActivity() {
     private var pending: MethodChannel.Result? = null
+    private var pool: SoundPool? = null
+    private var clickId = 0
+    private var clickReady = false
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "theta_music/click").setMethodCallHandler { call, result ->
+            when (call.method) {
+                "click" -> {
+                    val v = (call.argument<Double>("volume") ?: 0.6).toFloat()
+                    clickPool()
+                    if (clickReady) pool?.play(clickId, v, v, 1, 0, 1f)
+                    result.success(null)
+                }
+                "prepare" -> {
+                    clickPool()
+                    result.success(null)
+                }
+                else -> result.notImplemented()
+            }
+        }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "theta_music/voice").setMethodCallHandler { call, result ->
             if (call.method != "listen") {
                 result.notImplemented()
@@ -58,7 +87,52 @@ class MainActivity : AudioServiceActivity() {
         super.onActivityResult(requestCode, resultCode, data)
     }
 
+    /** 初回だけ、短いクリック音を作って SoundPool に読み込む */
+    private fun clickPool() {
+        if (pool != null) return
+        val p = SoundPool.Builder()
+            .setMaxStreams(4)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build(),
+            )
+            .build()
+        p.setOnLoadCompleteListener { _, _, status -> clickReady = status == 0 }
+        pool = p
+        val f = File(cacheDir, "ipod_click.wav")
+        if (!f.exists()) writeClick(f)
+        clickId = p.load(f.path, 1)
+    }
+
+    override fun onDestroy() {
+        pool?.release()
+        pool = null
+        super.onDestroy()
+    }
+
     companion object {
         private const val REQ_VOICE = 4101
+        private const val RATE = 44100
+
+        /** iPod のクリックホイールの「チッ」：数 ms のノイズと高い音を急に減衰させる */
+        private fun writeClick(f: File) {
+            val n = RATE * 8 / 1000
+            val rnd = Random(7)
+            val pcm = ShortArray(n) { i ->
+                val t = i.toDouble() / RATE
+                val env = exp(-t / 0.0011)
+                val v = (rnd.nextDouble() * 2 - 1) * 0.55 + sin(2 * PI * 3100 * t) * 0.45
+                (v * env * 0.9 * Short.MAX_VALUE).toInt().toShort()
+            }
+            val data = n * 2
+            val b = ByteBuffer.allocate(44 + data).order(ByteOrder.LITTLE_ENDIAN)
+            b.put("RIFF".toByteArray()).putInt(36 + data).put("WAVE".toByteArray())
+            b.put("fmt ".toByteArray()).putInt(16).putShort(1).putShort(1).putInt(RATE).putInt(RATE * 2).putShort(2).putShort(16)
+            b.put("data".toByteArray()).putInt(data)
+            pcm.forEach { b.putShort(it) }
+            FileOutputStream(f).use { it.write(b.array()) }
+        }
     }
 }

@@ -355,6 +355,16 @@ MenuScreen settingsMenu() {
         s.clicker = !s.clicker;
         save();
       }),
+      MenuItem('Haptics', detail: s.haptics ? 'On' : 'Off', onSelect: () {
+        s.haptics = !s.haptics;
+        save();
+      }),
+      if (s.source == MusicSource.dsaudio)
+        MenuItem('Fav = Rating', detail: s.dsFavRating == 0 ? 'Off' : '★${s.dsFavRating}+', onSelect: () {
+          // DS audio の★評価との同期: ★4以上 → ★5 だけ → 同期しない → ★3以上
+          s.dsFavRating = switch (s.dsFavRating) { 4 => 5, 5 => 0, 0 => 3, _ => 4 };
+          save();
+        }),
       MenuItem('Body Color', detail: s.blackBody ? 'Black' : 'Silver', onSelect: () {
         s.blackBody = !s.blackBody;
         save();

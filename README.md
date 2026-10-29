@@ -37,6 +37,10 @@ Tailscale 経由で NAS の音楽を再生する Android 音楽プレーヤー�
 - **お気に入り**：曲・アルバム・アーティストを ★ で登録（端末内の `favorites.json`。ライブラリを更新しても、
   WebDAV / DS audio を切り替えても同じ曲なら残る）。お気に入りだけを通しで再生・シャッフルもできる。
   Obsidian に書き出すと `favorite: true` と `#music/favorite` が付き、曲の表には ★ が付く
+  - **DS audio のときの曲は、Audio Station / DS audio の★評価と同期**（`SYNO.AudioStation.Song` の `setrating`）。
+    ★4 以上をお気に入りとみなし、登録すると★5、外すと★0 を NAS に書く（しきい値は ★3+ / ★4+ / ★5 / 同期しない から選べる）。
+    DS audio や Audio Station で付けた評価もそのまま反映される。アルバム・アーティストは端末内だけ
+    （Audio Station のピン留め API は一覧の取得しか確認できていないため）
 - **音声検索**：Android の音声入力（Google の音声入力画面）で話す。アプリにマイクの権限は要らない
   - 「宇多田ヒカルをかけて」「Radiohead をシャッフルで再生」→ いちばん近いものをすぐ再生
   - 「サカナクション」だけなら検索結果を出す。「アーティストの曲名」の言い方もできる
@@ -65,6 +69,7 @@ Theta スキンの書体 Oswald・Share Tech Mono は SIL Open Font License（`d
 | リングをなぞる | スクロール（Now Playing では音量） |
 | 中央ボタン | 決定（Now Playing ではシークモード切替）。長押しでお気に入り |
 | MENU | 戻る（Android の戻るボタンでも可）。長押しで音声検索 |
+| （設定） | Clicker：カリカリ音、Haptics：振動を、それぞれオン・オフ |
 | ▶❚❚ | 再生/一時停止 |
 | ◀◀ / ▶▶ | 前/次の曲、長押しで巻き戻し/早送り |
 

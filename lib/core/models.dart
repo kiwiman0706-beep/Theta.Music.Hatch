@@ -17,6 +17,8 @@ class Track {
   final int artLength;
   // Audio Station の曲 ID（DS audio 経由のときだけ）
   final String id;
+  // Audio Station の評価（0〜5、DS audio 経由のときだけ）
+  final int rating;
 
   const Track({
     required this.path,
@@ -34,6 +36,7 @@ class Track {
     this.artOffset = 0,
     this.artLength = 0,
     this.id = '',
+    this.rating = 0,
   });
 
   String get displayArtist => artist.isNotEmpty ? artist : 'Unknown Artist';
@@ -63,6 +66,7 @@ class Track {
         if (artLength != 0) 'ao': artOffset,
         if (artLength != 0) 'alen': artLength,
         if (id.isNotEmpty) 'i': id,
+        if (rating != 0) 'r': rating,
       };
 
   factory Track.fromJson(Map<String, dynamic> j) => Track(
@@ -81,6 +85,7 @@ class Track {
         artOffset: j['ao'] as int? ?? 0,
         artLength: j['alen'] as int? ?? 0,
         id: j['i'] as String? ?? '',
+        rating: j['r'] as int? ?? 0,
       );
 }
 

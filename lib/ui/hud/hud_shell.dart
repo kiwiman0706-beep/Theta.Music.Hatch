@@ -51,6 +51,21 @@ class _HudShellState extends State<HudShell> implements HudNav {
     super.initState();
     hudNav = this;
     if (!services.settings.configured) _tab = setupTab;
+    services.favorites.addListener(_onFavorites);
+  }
+
+  /// DS audio の★評価を保存できなかったとき
+  void _onFavorites() {
+    final e = services.favorites.syncError;
+    if (e == null || !mounted) return;
+    services.favorites.syncError = null;
+    hudToast(context, e);
+  }
+
+  @override
+  void dispose() {
+    services.favorites.removeListener(_onFavorites);
+    super.dispose();
   }
 
   @override

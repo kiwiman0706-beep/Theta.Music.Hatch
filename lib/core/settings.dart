@@ -17,7 +17,8 @@ class AppSettings extends ChangeNotifier {
   String musicPath = '/music';
   String obsidianPath = '';
   bool readTags = true;
-  bool clicker = true;
+  bool clicker = true; // iPod のカリカリ音
+  bool haptics = true; // ホイールの振動
   bool blackBody = false;
   bool shuffle = false;
   RepeatSetting repeat = RepeatSetting.off;
@@ -26,6 +27,9 @@ class AppSettings extends ChangeNotifier {
   String dsUrl = ''; // 例: http://nas.tailXXXX.ts.net:5000
   String dsDid = ''; // 2 段階認証のデバイストークン
   bool dsTranscode = false; // Audio Station で MP3 に変換して受け取る（回線が細いとき・非対応形式）
+  /// DS audio のとき、曲のお気に入りを Audio Station の★評価と同期する。
+  /// この★数以上をお気に入りとみなす（0 なら同期しない）。登録すると★5、外すと★0 にする
+  int dsFavRating = 4;
 
   /// 見た目: ipod（クリックホイール） / theta（ThetaHomeHatch の HUD）
   String skin = 'ipod';
@@ -42,6 +46,8 @@ class AppSettings extends ChangeNotifier {
     obsidianPath = _p.getString('obsidianPath') ?? '';
     readTags = _p.getBool('readTags') ?? true;
     clicker = _p.getBool('clicker') ?? true;
+    haptics = _p.getBool('haptics') ?? true;
+    dsFavRating = _p.getInt('dsFavRating') ?? 4;
     blackBody = _p.getBool('blackBody') ?? false;
     shuffle = _p.getBool('shuffle') ?? false;
     repeat = RepeatSetting.values[(_p.getInt('repeat') ?? 0).clamp(0, 2)];
@@ -65,6 +71,8 @@ class AppSettings extends ChangeNotifier {
     await _p.setString('obsidianPath', obsidianPath);
     await _p.setBool('readTags', readTags);
     await _p.setBool('clicker', clicker);
+    await _p.setBool('haptics', haptics);
+    await _p.setInt('dsFavRating', dsFavRating);
     await _p.setBool('blackBody', blackBody);
     await _p.setBool('shuffle', shuffle);
     await _p.setInt('repeat', repeat.index);

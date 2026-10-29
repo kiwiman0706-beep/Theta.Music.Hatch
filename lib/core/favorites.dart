@@ -10,11 +10,26 @@ import 'models.dart';
 /// お気に入り（曲・アルバム・アーティスト）。端末内の favorites.json に保存。
 /// 曲はパス、アルバムは「アーティスト＋アルバム名」、アーティストは名前で覚えるので、
 /// ライブラリを更新しても（WebDAV / DS audio を切り替えても同じ曲なら）残る。
+///
+/// DS audio のときの曲は、Audio Station の★評価と同期する（DS audio の評価と同じもの）：
+/// favRating() 個以上の★をお気に入りとみなし、登録で★5、解除で★0 を NAS に書く。
+/// アルバム・アーティストは Audio Station に対応する仕組みが無いので端末内だけ。
 class Favorites extends ChangeNotifier {
   final Library library;
-  Favorites(this.library) {
-    library.addListener(notifyListeners);
+  final int Function()? favRating; // 0 なら同期しない
+  final Future<void> Function(String id, int rating)? setRating;
+  Favorites(this.library, {this.favRating, this.setRating}) {
+    library.addListener(() {
+      _rating.clear(); // 更新後は NAS の評価をそのまま使う
+      notifyListeners();
+    });
   }
+
+  /// 書き換えた評価（次にライブラリを更新するまで）
+  final Map<String, int> _rating = {};
+
+  /// NAS への★評価の保存に失敗したとき（画面でお知らせして消す）
+  String? syncError;
 
   final Set<String> _tracks = {};
   final Set<String> _albums = {};
@@ -65,12 +80,28 @@ class Favorites extends ChangeNotifier {
     }
   }
 
-  bool isTrack(Track t) => _tracks.contains(t.path);
+  bool _synced(Track t) => t.id.isNotEmpty && setRating != null && (favRating?.call() ?? 0) > 0;
+  int ratingOf(Track t) => _rating[t.path] ?? t.rating;
+
+  bool isTrack(Track t) => _synced(t) ? ratingOf(t) >= favRating!() : _tracks.contains(t.path);
   bool isAlbum(Album a) => _albums.contains(a.key);
   bool isArtist(Artist a) => _artists.contains(a.key);
 
   /// 切り替えて、登録後の状態を返す
-  bool toggleTrack(Track t) => _toggle(_tracks, t.path);
+  bool toggleTrack(Track t) {
+    if (!_synced(t)) return _toggle(_tracks, t.path);
+    final on = !isTrack(t);
+    final before = ratingOf(t);
+    final r = on ? 5 : 0;
+    _rating[t.path] = r;
+    notifyListeners();
+    setRating!(t.id, r).catchError((Object e) {
+      _rating[t.path] = before;
+      syncError = '★評価を NAS に保存できませんでした: $e';
+      notifyListeners();
+    });
+    return on;
+  }
   bool toggleAlbum(Album a) => _toggle(_albums, a.key);
   bool toggleArtist(Artist a) => _toggle(_artists, a.key);
 
@@ -81,10 +112,10 @@ class Favorites extends ChangeNotifier {
     return added;
   }
 
-  int get count => _tracks.length + _albums.length + _artists.length;
+  int get count => tracks.length + albums.length + artists.length;
 
   /// ライブラリにある分だけ（並びは曲名順）
-  List<Track> get tracks => [for (final t in library.songs) if (_tracks.contains(t.path)) t];
+  List<Track> get tracks => [for (final t in library.songs) if (isTrack(t)) t];
   List<Album> get albums => [for (final a in library.albums) if (_albums.contains(a.key)) a];
   List<Artist> get artists => [for (final a in library.artists) if (_artists.contains(a.key)) a];
 
