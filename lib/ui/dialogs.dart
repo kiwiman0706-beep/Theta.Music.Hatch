@@ -200,3 +200,25 @@ Future<void> showObsidianDialog(BuildContext context) {
     ),
   );
 }
+
+/// 文字で検索（音声入力が使えないとき・iPod の Search → Type）
+Future<String?> showTextSearchDialog(BuildContext context) {
+  final c = TextEditingController();
+  return showDialog<String>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('検索'),
+      content: TextField(
+        controller: c,
+        autofocus: true,
+        textInputAction: TextInputAction.search,
+        onSubmitted: (v) => Navigator.pop(context, v),
+        decoration: const InputDecoration(hintText: '曲名・アルバム・アーティスト（「〜をかけて」で再生）'),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('キャンセル')),
+        FilledButton(onPressed: () => Navigator.pop(context, c.text), child: const Text('検索')),
+      ],
+    ),
+  );
+}

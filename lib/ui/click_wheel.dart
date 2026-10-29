@@ -8,7 +8,8 @@ import 'ipod_theme.dart';
 enum WheelButton { menu, next, previous, playPause, select }
 
 /// iPod のクリックホイール。リングをなぞると回転イベント、
-/// 上下左右/中央のタップでボタンイベント、◀◀/▶▶ 長押しで早送り/巻き戻し。
+/// 上下左右/中央のタップでボタンイベント、◀◀/▶▶ 長押しで早送り/巻き戻し、
+/// 中央・MENU の長押しは onHoldStart で受ける（お気に入り・音声検索）。
 class ClickWheel extends StatefulWidget {
   final double size;
   final IPodColors colors;
@@ -71,7 +72,7 @@ class _ClickWheelState extends State<ClickWheel> {
     _lastAngle = p.distance > _centerR * 0.6 ? atan2(p.dy, p.dx) : null;
     setState(() => _pressed = b);
     _holdTimer?.cancel();
-    if (b == WheelButton.next || b == WheelButton.previous) {
+    if (b != WheelButton.playPause) {
       _holdTimer = Timer(const Duration(milliseconds: 550), () {
         if (!_dragging) {
           _holding = true;

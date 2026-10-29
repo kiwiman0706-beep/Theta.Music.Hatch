@@ -79,6 +79,18 @@ class _IPodShellState extends State<IPodShell> implements Nav {
     push(NowPlayingScreen());
   }
 
+  String? _toast;
+  Timer? _toastTimer;
+
+  @override
+  void toast(String message) {
+    _toastTimer?.cancel();
+    setState(() => _toast = message);
+    _toastTimer = Timer(const Duration(milliseconds: 1600), () {
+      if (mounted) setState(() => _toast = null);
+    });
+  }
+
   void _click() {
     if (!services.settings.clicker) return;
     HapticFeedback.selectionClick();
@@ -107,6 +119,15 @@ class _IPodShellState extends State<IPodShell> implements Nav {
   }
 
   void _holdStart(WheelButton b) {
+    if (b == WheelButton.select || b == WheelButton.menu) {
+      HapticFeedback.heavyImpact();
+      if (b == WheelButton.select) {
+        _top.onLongSelect();
+      } else {
+        voiceSearch(); // MENU 長押しで音声検索
+      }
+      return;
+    }
     final d = b == WheelButton.next ? 1 : -1;
     _seekTimer?.cancel();
     var n = 0;
@@ -121,6 +142,7 @@ class _IPodShellState extends State<IPodShell> implements Nav {
   @override
   void dispose() {
     _seekTimer?.cancel();
+    _toastTimer?.cancel();
     services.settings.removeListener(_onChange);
     services.player.removeListener(_onChange);
     super.dispose();
@@ -150,7 +172,7 @@ class _IPodShellState extends State<IPodShell> implements Nav {
               return Column(children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(18, 18, 18, 0),
-                  child: SizedBox(height: screenH, child: _lcd(colors)),
+                  child: SizedBox(height: screenH, child: _withToast(_lcd(colors))),
                 ),
                 Expanded(
                   child: Center(
@@ -213,6 +235,32 @@ class _IPodShellState extends State<IPodShell> implements Nav {
         ),
       ),
     );
+  }
+
+  Widget _withToast(Widget lcd) {
+    return Stack(children: [
+      Positioned.fill(child: lcd),
+      if (_toast != null)
+        Positioned(
+          left: 16,
+          right: 16,
+          bottom: 14,
+          child: Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.72),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(_toast!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+            ),
+          ),
+        ),
+    ]);
   }
 
   Widget _header(String title) {

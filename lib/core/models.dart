@@ -100,6 +100,7 @@ class Album {
   final String artist;
   final List<Track> tracks;
   Album(this.title, this.artist, this.tracks);
+  String get key => tracks.first.albumKey;
   int get year => tracks.map((t) => t.year).fold(0, (a, b) => b > a ? b : a);
   String get genre => tracks.firstWhere((t) => t.genre.isNotEmpty, orElse: () => tracks.first).genre;
   ArtRef? get art {
@@ -114,5 +115,6 @@ class Artist {
   final String name;
   final List<Album> albums;
   Artist(this.name, this.albums);
+  String get key => name.toLowerCase();
   List<Track> get tracks => [for (final a in albums) ...a.tracks];
 }

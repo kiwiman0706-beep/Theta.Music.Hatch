@@ -367,9 +367,10 @@ class ReadoutBox extends StatelessWidget {
 class HudRow extends StatelessWidget {
   final Widget child;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress; // お気に入りの登録など
   final int zebra;
   final bool active;
-  const HudRow({super.key, required this.child, this.onTap, this.zebra = -1, this.active = false});
+  const HudRow({super.key, required this.child, this.onTap, this.onLongPress, this.zebra = -1, this.active = false});
 
   @override
   Widget build(BuildContext context) {
@@ -378,6 +379,7 @@ class HudRow extends StatelessWidget {
       color: active ? p.accent.withValues(alpha: 0.18) : (zebra % 2 == 1 ? p.zebra : Colors.transparent),
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 48),
           child: Padding(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), child: child),
@@ -482,5 +484,35 @@ class HudProgress extends StatelessWidget {
       const SizedBox(height: 3),
       const Ticks(height: 5),
     ]);
+  }
+}
+
+/// 画面の下に短いお知らせ（HUD の配色）
+void hudToast(BuildContext context, String message) {
+  final p = HudScope.of(context);
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(
+      duration: const Duration(milliseconds: 1600),
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: p.raised,
+      shape: p.pop
+          ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: p.line, width: 1.5))
+          : BeveledRectangleBorder(
+              borderRadius: const BorderRadius.only(topLeft: Radius.circular(8)), side: BorderSide(color: p.accent)),
+      content: Text(message, style: TextStyle(color: p.fg, fontFamily: p.mono, fontSize: 13)),
+    ));
+}
+
+/// ★ の印（お気に入り）
+class FavStar extends StatelessWidget {
+  final bool on;
+  final double size;
+  const FavStar(this.on, {super.key, this.size = 18});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    return Icon(on ? Icons.star : Icons.star_border, size: size, color: on ? p.accent : p.faint);
   }
 }

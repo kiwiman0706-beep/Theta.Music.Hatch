@@ -1,5 +1,6 @@
 import 'core/art_cache.dart';
 import 'core/dsaudio.dart';
+import 'core/favorites.dart';
 import 'core/library.dart';
 import 'core/obsidian.dart';
 import 'core/player.dart';
@@ -15,8 +16,9 @@ class Services {
   final ArtCache art;
   final Player player;
   final ObsidianExporter obsidian;
+  final Favorites favorites;
 
-  Services._(this.settings, this.library, this.ds, this.scanner, this.art, this.player, this.obsidian);
+  Services._(this.settings, this.library, this.ds, this.scanner, this.art, this.player, this.obsidian, this.favorites);
 
   static Future<Services> create() async {
     final settings = AppSettings();
@@ -25,6 +27,8 @@ class Services {
     await library.load();
     final ds = DsAudioClient(settings);
     final art = ArtCache(settings, ds);
+    final favorites = Favorites(library);
+    await favorites.load();
     return Services._(
       settings,
       library,
@@ -34,7 +38,9 @@ class Services {
       Player(settings, art, ds),
       // DS audio のときは File Station、WebDAV のときは WebDAV で Vault に書く
       ObsidianExporter(settings, library,
-          () => settings.source == MusicSource.dsaudio ? ds : settings.client()),
+          () => settings.source == MusicSource.dsaudio ? ds : settings.client(),
+          favorites: favorites),
+      favorites,
     );
   }
 }

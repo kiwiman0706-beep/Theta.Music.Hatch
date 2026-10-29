@@ -17,9 +17,25 @@ class NowPlayingScreen extends IPodScreen {
   Timer? _modeTimer;
 
   @override
-  void attach() => services.player.addListener(notifyListeners);
+  void attach() {
+    services.player.addListener(notifyListeners);
+    services.favorites.addListener(notifyListeners);
+  }
+
   @override
-  void detach() => services.player.removeListener(notifyListeners);
+  void detach() {
+    services.player.removeListener(notifyListeners);
+    services.favorites.removeListener(notifyListeners);
+  }
+
+  /// 中央ボタン長押しで、再生中の曲をお気に入りに
+  @override
+  void onLongSelect() {
+    final t = services.player.current;
+    if (t == null) return;
+    final on = services.favorites.toggleTrack(t);
+    nav.toast(on ? '★ お気に入りに追加' : 'お気に入りから外しました');
+  }
 
   void _setMode(_Mode m) {
     _mode = m;
@@ -84,10 +100,22 @@ class NowPlayingScreen extends IPodScreen {
                 child: Padding(
                   padding: EdgeInsets.only(top: artSize * 0.18),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(t.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: LcdColors.text)),
+                    Text.rich(
+                      TextSpan(children: [
+                        if (services.favorites.isTrack(t))
+                          const WidgetSpan(
+                            alignment: PlaceholderAlignment.middle,
+                            child: Padding(
+                              padding: EdgeInsets.only(right: 3),
+                              child: Icon(Icons.star_rounded, size: 17, color: Color(0xFF2F72D8)),
+                            ),
+                          ),
+                        TextSpan(text: t.title),
+                      ]),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: LcdColors.text),
+                    ),
                     const SizedBox(height: 4),
                     Text(t.displayArtist,
                         maxLines: 1,

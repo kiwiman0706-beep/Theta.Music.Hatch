@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../app.dart';
 import '../../core/models.dart';
+import '../../core/search.dart';
 import '../../core/settings.dart';
+import '../../core/voice.dart';
 import '../dialogs.dart';
 import 'hud_shell.dart';
 import 'hud_theme.dart';
@@ -24,6 +26,41 @@ String _fmt(Duration d) {
 String _extOf(String path) {
   final f = path.substring(path.lastIndexOf('/') + 1);
   return f.contains('.') ? f.substring(f.lastIndexOf('.') + 1).toUpperCase() : '—';
+}
+
+void _favTrack(BuildContext context, Track t) =>
+    hudToast(context, services.favorites.toggleTrack(t) ? '★ お気に入りに追加: ${t.title}' : 'お気に入りから外しました');
+void _favAlbum(BuildContext context, Album a) =>
+    hudToast(context, services.favorites.toggleAlbum(a) ? '★ お気に入りに追加: ${a.title}' : 'お気に入りから外しました');
+void _favArtist(BuildContext context, Artist a) =>
+    hudToast(context, services.favorites.toggleArtist(a) ? '★ お気に入りに追加: ${a.name}' : 'お気に入りから外しました');
+
+/// 音声入力 → 「〜をかけて」なら再生、それ以外は検索結果へ
+Future<void> hudVoiceSearch(BuildContext context) async {
+  List<String>? alts;
+  try {
+    alts = await Voice.listen();
+  } catch (e) {
+    if (context.mounted) hudToast(context, '$e');
+    return;
+  }
+  if (alts == null || !context.mounted) return;
+  hudRunSearch(context, alts);
+}
+
+void hudRunSearch(BuildContext context, List<String> alts) {
+  final r = searchVoice(services.library, alts);
+  if (r == null) return;
+  final (res, cmd) = r;
+  final best = res.best;
+  if (cmd.play && best != null) {
+    final (list, i) = best.playable;
+    services.player.playList(list, i, shuffle: cmd.shuffle);
+    hudNav.selectTab(nowTab);
+    hudToast(context, 'PLAY: ${best.label}');
+    return;
+  }
+  hudNav.open(SearchPage(initial: cmd.query));
 }
 
 // ------------------------------------------------------------------ 共通の枠
@@ -114,10 +151,53 @@ class _DetailHeader extends StatelessWidget {
   }
 }
 
-/// 検索欄（角を落とした枠）
-class _Search extends StatelessWidget {
+/// 検索欄（角を落とした枠）。右のマイクで音声入力
+class _Search extends StatefulWidget {
   final ValueChanged<String> onChanged;
-  const _Search({required this.onChanged});
+  final ValueChanged<String>? onSubmitted;
+  /// マイクで認識したとき（既定は欄に文字を入れる）
+  final void Function(List<String> alternatives)? onVoice;
+  final String initial;
+  final bool autofocus;
+  const _Search({required this.onChanged, this.onSubmitted, this.onVoice, this.initial = '', this.autofocus = false});
+
+  @override
+  State<_Search> createState() => _SearchState();
+}
+
+class _SearchState extends State<_Search> {
+  late final TextEditingController _c = TextEditingController(text: widget.initial);
+
+  @override
+  void didUpdateWidget(_Search old) {
+    super.didUpdateWidget(old);
+    // 音声で検索語が変わったとき、欄にも反映
+    if (widget.initial != old.initial && widget.initial != _c.text) _c.text = widget.initial;
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  Future<void> _voice() async {
+    List<String>? alts;
+    try {
+      alts = await Voice.listen();
+    } catch (e) {
+      if (mounted) hudToast(context, '$e');
+      return;
+    }
+    if (alts == null || !mounted) return;
+    if (widget.onVoice != null) {
+      widget.onVoice!(alts);
+      return;
+    }
+    final q = parseVoiceCommand(alts.first).query;
+    _c.text = q;
+    widget.onChanged(q);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -133,7 +213,11 @@ class _Search extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: TextField(
-              onChanged: onChanged,
+              controller: _c,
+              autofocus: widget.autofocus,
+              onChanged: widget.onChanged,
+              onSubmitted: widget.onSubmitted,
+              textInputAction: TextInputAction.search,
               style: TextStyle(color: p.fg, fontFamily: p.mono, fontSize: 15),
               cursorColor: p.accent,
               decoration: InputDecoration(
@@ -143,6 +227,11 @@ class _Search extends StatelessWidget {
                 hintStyle: TextStyle(color: p.faint, fontFamily: p.mono, letterSpacing: 1.5),
               ),
             ),
+          ),
+          IconButton(
+            tooltip: '音声検索',
+            onPressed: _voice,
+            icon: Icon(Icons.mic_none, color: p.accent),
           ),
         ]),
       ),
@@ -198,7 +287,7 @@ Widget _emptyLibrary(BuildContext context) {
         PillButton(
           text: services.settings.configured ? 'ライブラリを更新' : '接続設定',
           primary: true,
-          onTap: () => services.settings.configured ? hudNav.selectTab(6) : showServerDialog(context),
+          onTap: () => services.settings.configured ? hudNav.selectTab(libraryTab) : showServerDialog(context),
         ),
       ]),
     ),
@@ -225,6 +314,14 @@ class NowPage extends StatelessWidget {
           en: t == null ? 'STANDBY' : 'TRACK ${(pl.index + 1).toString().padLeft(2, '0')}/${pl.queue.length.toString().padLeft(2, '0')}',
           ja: t == null ? '待機中' : (pl.playing ? 'PLAY / 再生中' : 'PAUSE / 一時停止'),
         ),
+      ),
+      // ライブラリ全体の検索。マイクで「〜をかけて」と言うとすぐ再生
+      _Search(
+        onChanged: (_) {},
+        onSubmitted: (q) {
+          if (q.trim().isNotEmpty) hudRunSearch(context, [q]);
+        },
+        onVoice: (alts) => hudRunSearch(context, alts),
       ),
       Padding(
         padding: const EdgeInsets.fromLTRB(14, 0, 10, 10),
@@ -304,6 +401,9 @@ class NowPage extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     HudBadge(_extOf(t.path), width: 64),
+                    const SizedBox(width: 8),
+                    HudBadge(services.favorites.isTrack(t) ? '★ FAV' : '☆ FAV',
+                        width: 70, highlight: services.favorites.isTrack(t), onTap: () => _favTrack(context, t)),
                   ]),
                   if (pl.lastError != null) ...[
                     const SizedBox(height: 8),
@@ -411,6 +511,7 @@ class _QueuePanel extends StatelessWidget {
               zebra: i - start,
               active: i == pl.index,
               onTap: () => pl.jumpTo(i),
+              onLongPress: () => _favTrack(context, pl.queue[i]),
               child: Row(children: [
                 SizedBox(
                   width: 30,
@@ -418,6 +519,7 @@ class _QueuePanel extends StatelessWidget {
                       style: TextStyle(color: i == pl.index ? p.accent : p.faint, fontFamily: p.mono, fontSize: 12)),
                 ),
                 Expanded(child: TwoLines(pl.queue[i].title, pl.queue[i].displayArtist)),
+                if (services.favorites.isTrack(pl.queue[i])) const FavStar(true, size: 16),
               ]),
             ),
         ]),
@@ -454,10 +556,12 @@ class _ArtistsPageState extends State<ArtistsPage> {
             return HudRow(
               zebra: i,
               onTap: () => hudNav.open(ArtistDetail(artist: a)),
+              onLongPress: () => _favArtist(context, a),
               child: Row(children: [
                 Initial(a.name, size: 38),
                 const SizedBox(width: 12),
                 Expanded(child: TwoLines(a.name, '${a.albums.length} ALBUMS · ${a.tracks.length} SONGS')),
+                if (services.favorites.isArtist(a)) const FavStar(true),
               ]),
             );
           },
@@ -481,6 +585,12 @@ class ArtistDetail extends StatelessWidget {
           PillButton(text: 'PLAY ALL', icon: Icons.play_arrow, primary: true, onTap: () => _play(artist.tracks, 0)),
           const SizedBox(width: 10),
           PillButton(text: 'SHUFFLE', icon: Icons.shuffle, onTap: () => _play(artist.tracks, 0, shuffle: true)),
+          const SizedBox(width: 10),
+          PillButton(
+            icon: services.favorites.isArtist(artist) ? Icons.star : Icons.star_border,
+            text: 'FAV',
+            onTap: () => _favArtist(context, artist),
+          ),
         ]),
       ),
       Padding(
@@ -558,8 +668,21 @@ class _AlbumGrid extends StatelessWidget {
           final a = albums[i];
           return GestureDetector(
             onTap: () => hudNav.open(AlbumDetail(album: a)),
+            onLongPress: () => _favAlbum(context, a),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              HudArt(a.art),
+              Stack(children: [
+                HudArt(a.art),
+                if (services.favorites.isAlbum(a))
+                  Positioned(
+                    right: 4,
+                    top: 4,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      color: p.bg.withValues(alpha: 0.7),
+                      child: const FavStar(true, size: 16),
+                    ),
+                  ),
+              ]),
               const SizedBox(height: 6),
               Text(a.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: p.fg, fontSize: 13)),
               Text(a.artist,
@@ -604,6 +727,12 @@ class AlbumDetail extends StatelessWidget {
           PillButton(text: 'PLAY', icon: Icons.play_arrow, primary: true, onTap: () => _play(album.tracks, 0)),
           const SizedBox(width: 10),
           PillButton(text: 'SHUFFLE', icon: Icons.shuffle, onTap: () => _play(album.tracks, 0, shuffle: true)),
+          const SizedBox(width: 10),
+          PillButton(
+            icon: services.favorites.isAlbum(album) ? Icons.star : Icons.star_border,
+            text: 'FAV',
+            onTap: () => _favAlbum(context, album),
+          ),
         ]),
       ),
       Padding(
@@ -618,6 +747,7 @@ class AlbumDetail extends StatelessWidget {
                 zebra: i,
                 active: album.tracks[i].path == cur,
                 onTap: () => _play(album.tracks, i),
+                onLongPress: () => _favTrack(context, album.tracks[i]),
                 child: Row(children: [
                   SizedBox(
                     width: 34,
@@ -630,6 +760,13 @@ class AlbumDetail extends StatelessWidget {
                     child: TwoLines(
                       album.tracks[i].title,
                       album.tracks[i].displayArtist == album.artist ? null : album.tracks[i].displayArtist,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => _favTrack(context, album.tracks[i]),
+                    child: Padding(
+                      padding: const EdgeInsets.all(6),
+                      child: FavStar(services.favorites.isTrack(album.tracks[i])),
                     ),
                   ),
                 ]),
@@ -678,11 +815,13 @@ class _SongsPageState extends State<SongsPage> {
             zebra: i,
             active: list[i].path == cur,
             onTap: () => _play(list, i),
+            onLongPress: () => _favTrack(context, list[i]),
             child: Row(children: [
               HudBadge(_extOf(list[i].path), width: 44),
               const SizedBox(width: 10),
               Expanded(child: TwoLines(list[i].title, '${list[i].displayArtist} · ${list[i].displayAlbum}')),
               if (list[i].path == cur) Icon(Icons.graphic_eq, color: p.accent, size: 18),
+              if (services.favorites.isTrack(list[i])) const FavStar(true, size: 16),
             ]),
           ),
         ),
@@ -1009,5 +1148,226 @@ class SettingsPage extends StatelessWidget {
         HudBadge(value ?? (on ? 'ON' : 'OFF'), highlight: on, onTap: tap, width: 56),
       ]),
     );
+  }
+}
+
+// ------------------------------------------------------------------ FAVS
+
+class FavsPage extends StatelessWidget {
+  const FavsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    final f = services.favorites;
+    final tracks = f.tracks, albums = f.albums, artists = f.artists;
+    final cur = services.player.current?.path;
+    return ListView(padding: EdgeInsets.zero, children: [
+      _RootHeader(code: 'LIB.FAVORITES', big: '${f.count}', en: 'FAVORITES', ja: 'お気に入り'),
+      if (f.count == 0)
+        const Padding(
+          padding: EdgeInsets.fromLTRB(14, 0, 10, 10),
+          child: HudPanel(
+            code: 'HOW TO',
+            title: '登録のしかた',
+            child: Note('曲・アルバム・アーティストの ★ を押すか、行を長押しすると、ここに並びます。'
+                'iPod スキンでは中央ボタンの長押しです。'),
+          ),
+        )
+      else ...[
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 0, 10, 10),
+          child: Wrap(spacing: 10, runSpacing: 10, children: [
+            PillButton(text: 'PLAY ALL', icon: Icons.play_arrow, primary: true, onTap: () => _play(f.allTracks, 0)),
+            PillButton(text: 'SHUFFLE', icon: Icons.shuffle, onTap: () => _play(f.allTracks, 0, shuffle: true)),
+          ]),
+        ),
+        if (artists.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 10, 10),
+            child: HudPanel(
+              code: 'ARTISTS',
+              title: 'アーティスト',
+              padding: const EdgeInsets.fromLTRB(4, 12, 4, 4),
+              child: Column(children: [
+                for (var i = 0; i < artists.length; i++)
+                  HudRow(
+                    zebra: i,
+                    onTap: () => hudNav.open(ArtistDetail(artist: artists[i])),
+                    onLongPress: () => _favArtist(context, artists[i]),
+                    child: Row(children: [
+                      Initial(artists[i].name, size: 34),
+                      const SizedBox(width: 12),
+                      Expanded(child: TwoLines(artists[i].name, '${artists[i].tracks.length} SONGS')),
+                      const FavStar(true),
+                    ]),
+                  ),
+              ]),
+            ),
+          ),
+        if (albums.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 10, 10),
+            child: HudPanel(code: 'ALBUMS', title: 'アルバム', child: _AlbumGrid(albums: albums, shrink: true)),
+          ),
+        if (tracks.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 10, 10),
+            child: HudPanel(
+              code: 'SONGS',
+              title: '曲',
+              padding: const EdgeInsets.fromLTRB(4, 12, 4, 4),
+              child: Column(children: [
+                for (var i = 0; i < tracks.length; i++)
+                  HudRow(
+                    zebra: i,
+                    active: tracks[i].path == cur,
+                    onTap: () => _play(tracks, i),
+                    onLongPress: () => _favTrack(context, tracks[i]),
+                    child: Row(children: [
+                      HudBadge(_extOf(tracks[i].path), width: 44),
+                      const SizedBox(width: 10),
+                      Expanded(child: TwoLines(tracks[i].title, '${tracks[i].displayArtist} · ${tracks[i].displayAlbum}')),
+                      GestureDetector(
+                        onTap: () => _favTrack(context, tracks[i]),
+                        child: const Padding(padding: EdgeInsets.all(6), child: FavStar(true)),
+                      ),
+                    ]),
+                  ),
+              ]),
+            ),
+          ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 0, 10, 10),
+          child: Note('長押しか ★ で外せます。Obsidian に書き出すと favorite: true が付きます。',),
+        ),
+      ],
+      SizedBox(height: p.pop ? 6 : 0),
+    ]);
+  }
+}
+
+// ------------------------------------------------------------------ SEARCH
+
+class SearchPage extends StatefulWidget {
+  final String initial;
+  const SearchPage({super.key, this.initial = ''});
+  @override
+  State<SearchPage> createState() => _SearchPageState();
+}
+
+class _SearchPageState extends State<SearchPage> {
+  late String _q = widget.initial;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    final r = search(services.library, _q, limit: 30);
+    final best = r.best;
+    Widget section(String code, String title, List<Widget> rows) => Padding(
+          padding: const EdgeInsets.fromLTRB(14, 0, 10, 10),
+          child: HudPanel(
+            code: code,
+            title: title,
+            padding: const EdgeInsets.fromLTRB(4, 12, 4, 4),
+            trailing: Text('${rows.length}', style: TextStyle(color: p.faint, fontSize: 11, fontFamily: p.mono)),
+            child: Column(children: rows),
+          ),
+        );
+    return ListView(padding: EdgeInsets.zero, children: [
+      _DetailHeader(code: 'LIB.SEARCH', title: _q.isEmpty ? 'SEARCH' : _q, sub: '検索・音声検索'),
+      _Search(
+        initial: _q,
+        autofocus: _q.isEmpty,
+        onChanged: (v) => setState(() => _q = v),
+        onVoice: (alts) {
+          final v = searchVoice(services.library, alts);
+          if (v == null) return;
+          if (v.$2.play && v.$1.best != null) {
+            hudRunSearch(context, alts);
+          } else {
+            setState(() => _q = v.$2.query);
+          }
+        },
+      ),
+      if (_q.trim().isNotEmpty && r.isEmpty)
+        const Padding(padding: EdgeInsets.fromLTRB(14, 0, 10, 10), child: Note('見つかりません。')),
+      if (best != null)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 0, 10, 10),
+          child: HudPanel(
+            code: 'BEST',
+            title: 'いちばん近い',
+            child: Row(children: [
+              Expanded(
+                child: TwoLines(
+                  best.label,
+                  switch (best.kind) { HitKind.artist => 'ARTIST', HitKind.album => 'ALBUM', HitKind.track => 'SONG' },
+                  bold: true,
+                ),
+              ),
+              PillButton(
+                icon: Icons.play_arrow,
+                text: 'PLAY',
+                primary: true,
+                onTap: () {
+                  final (list, i) = best.playable;
+                  _play(list, i);
+                },
+              ),
+            ]),
+          ),
+        ),
+      if (r.artists.isNotEmpty)
+        section('ARTISTS', 'アーティスト', [
+          for (var i = 0; i < r.artists.length; i++)
+            HudRow(
+              zebra: i,
+              onTap: () => hudNav.open(ArtistDetail(artist: r.artists[i])),
+              onLongPress: () => _favArtist(context, r.artists[i]),
+              child: Row(children: [
+                Initial(r.artists[i].name, size: 34),
+                const SizedBox(width: 12),
+                Expanded(child: TwoLines(r.artists[i].name, '${r.artists[i].albums.length} ALBUMS')),
+                if (services.favorites.isArtist(r.artists[i])) const FavStar(true),
+              ]),
+            ),
+        ]),
+      if (r.albums.isNotEmpty)
+        section('ALBUMS', 'アルバム', [
+          for (var i = 0; i < r.albums.length; i++)
+            HudRow(
+              zebra: i,
+              onTap: () => hudNav.open(AlbumDetail(album: r.albums[i])),
+              onLongPress: () => _favAlbum(context, r.albums[i]),
+              child: Row(children: [
+                HudArt(r.albums[i].art, size: 40),
+                const SizedBox(width: 12),
+                Expanded(child: TwoLines(r.albums[i].title, r.albums[i].artist)),
+                if (services.favorites.isAlbum(r.albums[i])) const FavStar(true),
+              ]),
+            ),
+        ]),
+      if (r.tracks.isNotEmpty)
+        section('SONGS', '曲', [
+          for (var i = 0; i < r.tracks.length; i++)
+            HudRow(
+              zebra: i,
+              onTap: () => _play(r.tracks, i),
+              onLongPress: () => _favTrack(context, r.tracks[i]),
+              child: Row(children: [
+                HudBadge(_extOf(r.tracks[i].path), width: 44),
+                const SizedBox(width: 10),
+                Expanded(child: TwoLines(r.tracks[i].title, '${r.tracks[i].displayArtist} · ${r.tracks[i].displayAlbum}')),
+                if (services.favorites.isTrack(r.tracks[i])) const FavStar(true, size: 16),
+              ]),
+            ),
+        ]),
+      const Padding(
+        padding: EdgeInsets.fromLTRB(14, 0, 10, 10),
+        child: Note('マイクで「〇〇をかけて」「〇〇をシャッフルで再生」と言うと、すぐに流します。'
+            '「アーティストの曲名」の言い方もできます。'),
+      ),
+    ]);
   }
 }

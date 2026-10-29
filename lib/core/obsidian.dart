@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import 'favorites.dart';
 import 'library.dart';
 import 'models.dart';
 import 'note_store.dart';
@@ -9,7 +10,8 @@ import 'settings.dart';
 const _begin = '<!-- theta-music:begin (この区間は自動生成。外側に書いたメモは保持されます) -->';
 const _end = '<!-- theta-music:end -->';
 const _managedKeys = {
-  'type', 'artist', 'album', 'year', 'genre', 'tracks', 'nas_path', 'tags', 'albums', 'songs', 'updated'
+  'type', 'artist', 'album', 'year', 'genre', 'tracks', 'nas_path', 'tags', 'albums', 'songs', 'updated', 'favorite',
+  'favorite_songs'
 };
 
 String safeName(String s) {
@@ -28,7 +30,8 @@ class ObsidianExporter extends ChangeNotifier {
   final AppSettings settings;
   final Library library;
   final NoteStore Function() store; // WebDAV か File Station
-  ObsidianExporter(this.settings, this.library, this.store);
+  final Favorites? favorites;
+  ObsidianExporter(this.settings, this.library, this.store, {this.favorites});
 
   bool running = false;
   int done = 0;
@@ -58,7 +61,10 @@ class ObsidianExporter extends ChangeNotifier {
         if (a.genre.isNotEmpty) 'genre': _yamlStr(a.genre),
         'tracks': '${a.tracks.length}',
         'nas_path': _yamlStr(a.tracks.first.folder),
-        'tags': '[music/album]',
+        'tags': (favorites?.isAlbum(a) ?? false) ? '[music/album, music/favorite]' : '[music/album]',
+        if (favorites?.isAlbum(a) ?? false) 'favorite': 'true',
+        if (a.tracks.any((t) => favorites?.isTrack(t) ?? false))
+          'favorite_songs': '${a.tracks.where((t) => favorites!.isTrack(t)).length}',
         'updated': now,
       };
       final b = StringBuffer()
@@ -70,7 +76,8 @@ class ObsidianExporter extends ChangeNotifier {
         ..writeln('|---|---|---|');
       for (final t in a.tracks) {
         final no = t.discNo > 0 ? '${t.discNo}-${t.trackNo}' : '${t.trackNo == 0 ? '' : t.trackNo}';
-        b.writeln('| $no | ${t.title.replaceAll('|', '\\|')} | ${t.displayArtist.replaceAll('|', '\\|')} |');
+        final star = (favorites?.isTrack(t) ?? false) ? '★ ' : '';
+        b.writeln('| $no | $star${t.title.replaceAll('|', '\\|')} | ${t.displayArtist.replaceAll('|', '\\|')} |');
       }
       notes['${_albumNote(a)}.md'] = (fm, b.toString());
     }
@@ -80,7 +87,8 @@ class ObsidianExporter extends ChangeNotifier {
         'type': 'artist',
         'albums': '${ar.albums.length}',
         'songs': '${ar.tracks.length}',
-        'tags': '[music/artist]',
+        'tags': (favorites?.isArtist(ar) ?? false) ? '[music/artist, music/favorite]' : '[music/artist]',
+        if (favorites?.isArtist(ar) ?? false) 'favorite': 'true',
         'updated': now,
       };
       final b = StringBuffer()

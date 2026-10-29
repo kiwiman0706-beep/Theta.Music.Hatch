@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../app.dart';
 import '../core/models.dart';
+import '../core/search.dart';
 import '../core/settings.dart';
+import '../core/voice.dart';
 import 'dialogs.dart';
 import 'ipod_theme.dart';
 import 'screens.dart';
@@ -16,6 +18,8 @@ MenuScreen mainMenu() => MenuScreen(
       'iPod',
       () => [
         MenuItem('Music', chevron: true, onSelect: () => nav.push(musicMenu())),
+        MenuItem('Favorites', chevron: true, onSelect: () => nav.push(favoritesMenu())),
+        MenuItem('Search', chevron: true, onSelect: () => nav.push(searchStartMenu())),
         MenuItem('Library', chevron: true, onSelect: () => nav.push(libraryMenu())),
         MenuItem('Settings', chevron: true, onSelect: () => nav.push(settingsMenu())),
         MenuItem('Shuffle Songs', onSelect: () {
@@ -35,6 +39,128 @@ List<MenuItem> _emptyHint() => [
         MenuItem('Update Library…', chevron: true, onSelect: () => startScan(false)),
     ];
 
+// ------------------------------------------------------------- お気に入り（中央ボタン長押しで登録）
+
+void _favToast(bool on) => nav.toast(on ? '★ お気に入りに追加' : 'お気に入りから外しました');
+
+MenuItem _trackItem(List<Track> list, int i) => MenuItem(
+      list[i].title,
+      starred: services.favorites.isTrack(list[i]),
+      onSelect: () => _play(list, i),
+      onLong: () => _favToast(services.favorites.toggleTrack(list[i])),
+    );
+
+MenuItem _albumItem(Album al, {String? label}) => MenuItem(
+      label ?? al.title,
+      chevron: true,
+      starred: services.favorites.isAlbum(al),
+      onSelect: () => nav.push(albumMenu(al)),
+      onLong: () => _favToast(services.favorites.toggleAlbum(al)),
+    );
+
+MenuItem _artistItem(Artist a) => MenuItem(
+      a.name,
+      chevron: true,
+      starred: services.favorites.isArtist(a),
+      onSelect: () => nav.push(artistMenu(a)),
+      onLong: () => _favToast(services.favorites.toggleArtist(a)),
+    );
+
+MenuScreen favoritesMenu() {
+  final f = services.favorites;
+  return MenuScreen(
+    'Favorites',
+    () => f.count == 0
+        ? [const MenuItem('中央ボタン長押しで登録'), const MenuItem('（曲・アルバム・アーティスト）')]
+        : [
+            MenuItem('Shuffle Favorites', onSelect: () {
+              final all = f.allTracks;
+              if (all.isNotEmpty) _play(all, 0, shuffle: true);
+            }),
+            MenuItem('Songs', detail: '${f.tracks.length}', chevron: true,
+                onSelect: () => nav.push(songsMenu(f.tracks, 'Fav Songs'))),
+            MenuItem('Albums', detail: '${f.albums.length}', chevron: true,
+                onSelect: () => nav.push(albumsMenu(f.albums, 'Fav Albums'))),
+            MenuItem('Artists', detail: '${f.artists.length}', chevron: true,
+                onSelect: () => nav.push(MenuScreen('Fav Artists', () => [for (final a in f.artists) _artistItem(a)],
+                    deps: [f]))),
+          ],
+    deps: [f],
+  );
+}
+
+// ------------------------------------------------------------- 検索（MENU 長押しで音声検索）
+
+MenuScreen searchStartMenu() => MenuScreen('Search', () => [
+      MenuItem('Voice Search', detail: 'MENU 長押し', onSelect: voiceSearch),
+      MenuItem('Type…', onSelect: () async {
+        final q = await showTextSearchDialog(nav.context);
+        if (q != null && q.trim().isNotEmpty) _runSearch([q]);
+      }),
+    ]);
+
+Future<void> voiceSearch() async {
+  if (services.library.tracks.isEmpty) {
+    nav.toast('ライブラリが空です');
+    return;
+  }
+  final ctx = nav.context;
+  List<String>? alts;
+  try {
+    alts = await Voice.listen();
+  } on VoiceUnavailable {
+    // 音声入力が無い端末では文字で
+    if (!ctx.mounted) return;
+    final q = await showTextSearchDialog(ctx);
+    alts = q == null || q.trim().isEmpty ? null : [q];
+  } catch (e) {
+    nav.toast('音声入力エラー: $e');
+    return;
+  }
+  if (alts != null) _runSearch(alts);
+}
+
+void _runSearch(List<String> alts) {
+  final r = searchVoice(services.library, alts);
+  if (r == null) return;
+  final (res, cmd) = r;
+  final best = res.best;
+  // 「〜をかけて」なら、いちばん当たったものをすぐ再生
+  if (cmd.play && best != null) {
+    final (list, i) = best.playable;
+    services.player.playList(list, i, shuffle: cmd.shuffle);
+    nav.showNowPlaying();
+    nav.toast('再生: ${best.label}');
+    return;
+  }
+  nav.push(searchMenu(res));
+}
+
+MenuScreen searchMenu(SearchResult r) => MenuScreen(
+      r.query.isEmpty ? 'Search' : r.query,
+      () => [
+        if (r.best != null)
+          MenuItem('Play: ${r.best!.label}', onSelect: () {
+            final (list, i) = r.best!.playable;
+            _play(list, i);
+          }),
+        if (r.isEmpty) MenuItem('見つかりません', detail: r.query),
+        for (final a in r.artists) MenuItem(a.name, detail: 'Artist', chevron: true,
+            starred: services.favorites.isArtist(a), onSelect: () => nav.push(artistMenu(a)),
+            onLong: () => _favToast(services.favorites.toggleArtist(a))),
+        for (final al in r.albums) MenuItem(al.title, detail: 'Album', chevron: true,
+            starred: services.favorites.isAlbum(al), onSelect: () => nav.push(albumMenu(al)),
+            onLong: () => _favToast(services.favorites.toggleAlbum(al))),
+        for (var i = 0; i < r.tracks.length; i++) MenuItem(r.tracks[i].title, detail: 'Song',
+            starred: services.favorites.isTrack(r.tracks[i]), onSelect: () => _play(r.tracks, i),
+            onLong: () => _favToast(services.favorites.toggleTrack(r.tracks[i]))),
+        MenuItem('Search Again', chevron: true, onSelect: voiceSearch),
+      ],
+      deps: [services.favorites],
+    );
+
+// ------------------------------------------------------------- 一覧
+
 MenuScreen musicMenu() => MenuScreen(
       'Music',
       () => services.library.tracks.isEmpty
@@ -52,46 +178,38 @@ MenuScreen musicMenu() => MenuScreen(
 
 MenuScreen artistsMenu() => MenuScreen(
       'Artists',
-      () => [
-        for (final a in services.library.artists)
-          MenuItem(a.name, chevron: true, onSelect: () => nav.push(artistMenu(a))),
-      ],
+      () => [for (final a in services.library.artists) _artistItem(a)],
       letterIndex: true,
+      deps: [services.favorites],
     );
 
 MenuScreen artistMenu(Artist a) => MenuScreen(
       a.name,
       () => [
         MenuItem('All Songs', chevron: true, onSelect: () => nav.push(songsMenu(a.tracks, a.name, keepOrder: true))),
-        for (final al in a.albums)
-          MenuItem(al.title, chevron: true, onSelect: () => nav.push(albumMenu(al))),
+        for (final al in a.albums) _albumItem(al),
       ],
+      deps: [services.favorites],
     );
 
 MenuScreen albumsMenu(List<Album> albums, String title) => MenuScreen(
       title,
-      () => [
-        for (final al in albums)
-          MenuItem(al.title, chevron: true, onSelect: () => nav.push(albumMenu(al))),
-      ],
+      () => [for (final al in albums) _albumItem(al)],
       letterIndex: true,
+      deps: [services.favorites],
     );
 
 MenuScreen albumMenu(Album al) => MenuScreen(
       al.title,
-      () => [
-        for (var i = 0; i < al.tracks.length; i++)
-          MenuItem(al.tracks[i].title, onSelect: () => _play(al.tracks, i)),
-      ],
+      () => [for (var i = 0; i < al.tracks.length; i++) _trackItem(al.tracks, i)],
+      deps: [services.favorites],
     );
 
 MenuScreen songsMenu(List<Track> tracks, String title, {bool keepOrder = false}) => MenuScreen(
       title,
-      () => [
-        for (var i = 0; i < tracks.length; i++)
-          MenuItem(tracks[i].title, onSelect: () => _play(tracks, i)),
-      ],
+      () => [for (var i = 0; i < tracks.length; i++) _trackItem(tracks, i)],
       letterIndex: !keepOrder,
+      deps: [services.favorites],
     );
 
 MenuScreen genresMenu() => MenuScreen(
@@ -118,7 +236,7 @@ MenuScreen folderMenu(String dir) {
     name,
     () => [
       for (final s in subs) MenuItem(s, chevron: true, onSelect: () => nav.push(folderMenu('$dir/$s'))),
-      for (var i = 0; i < files.length; i++) MenuItem(files[i].title, onSelect: () => _play(files, i)),
+      for (var i = 0; i < files.length; i++) _trackItem(files, i),
     ],
     letterIndex: true,
   );

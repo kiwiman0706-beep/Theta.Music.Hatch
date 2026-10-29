@@ -13,6 +13,8 @@ abstract class Nav {
   void push(IPodScreen s);
   void pop();
   void showNowPlaying();
+  /// 液晶の下の方に短いお知らせを出す
+  void toast(String message);
 }
 
 late Nav nav;
@@ -23,6 +25,8 @@ abstract class IPodScreen extends ChangeNotifier {
   final Key key = UniqueKey();
   void onScroll(int delta) {}
   void onSelect() {}
+  /// 中央ボタンの長押し（お気に入りの登録など）
+  void onLongSelect() {}
   Widget build(BuildContext context);
   void attach() {}
   void detach() {}
@@ -33,7 +37,9 @@ class MenuItem {
   final String? detail;
   final bool chevron;
   final VoidCallback? onSelect;
-  const MenuItem(this.label, {this.detail, this.chevron = false, this.onSelect});
+  final VoidCallback? onLong; // 中央ボタン長押し・行の長押し
+  final bool starred;
+  const MenuItem(this.label, {this.detail, this.chevron = false, this.onSelect, this.onLong, this.starred = false});
 }
 
 /// リスト形式のメニュー画面
@@ -123,6 +129,12 @@ class MenuScreen extends IPodScreen {
   }
 
   @override
+  void onLongSelect() {
+    if (items.isEmpty) return;
+    items[selected].onLong?.call();
+  }
+
+  @override
   void dispose() {
     _letterTimer?.cancel();
     scroll.dispose();
@@ -177,10 +189,22 @@ class MenuScreen extends IPodScreen {
         notifyListeners();
         it.onSelect?.call();
       },
+      onLongPress: it.onLong == null
+          ? null
+          : () {
+              selected = i;
+              notifyListeners();
+              it.onLong!.call();
+            },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8),
         decoration: sel ? const BoxDecoration(gradient: LcdColors.selection) : null,
         child: Row(children: [
+          if (it.starred)
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: Icon(Icons.star_rounded, size: _rowH * 0.5, color: sel ? Colors.white : const Color(0xFF2F72D8)),
+            ),
           Expanded(
             child: Text(it.label,
                 maxLines: 1,

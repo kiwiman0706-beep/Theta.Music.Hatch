@@ -25,6 +25,7 @@ class _TabDef {
 
 const _tabs = [
   _TabDef('NOW', 0),
+  _TabDef('FAVS', 0),
   _TabDef('ARTISTS', 1),
   _TabDef('ALBUMS', 1),
   _TabDef('SONGS', 1),
@@ -32,7 +33,7 @@ const _tabs = [
   _TabDef('FOLDERS', 1),
   _TabDef('LIBRARY', 2),
 ];
-const setupTab = 7;
+const nowTab = 0, favTab = 1, libraryTab = 7, setupTab = 8;
 
 /// ThetaHomeHatch 風の画面：左に中身、右端に縦書きのタブ（ThetaHomeHatch の閉じた画面と同じ構成）
 class HudShell extends StatefulWidget {
@@ -67,13 +68,14 @@ class _HudShellState extends State<HudShell> implements HudNav {
       });
 
   Widget _root() => switch (_tab) {
-        0 => const NowPage(),
-        1 => const ArtistsPage(),
-        2 => AlbumsPage(albums: services.library.albums),
-        3 => SongsPage(tracks: services.library.songs),
-        4 => const GenresPage(),
-        5 => FolderPage(dir: services.library.root),
-        6 => const LibraryPage(),
+        nowTab => const NowPage(),
+        favTab => const FavsPage(),
+        2 => const ArtistsPage(),
+        3 => AlbumsPage(albums: services.library.albums),
+        4 => SongsPage(tracks: services.library.songs),
+        5 => const GenresPage(),
+        6 => FolderPage(dir: services.library.root),
+        libraryTab => const LibraryPage(),
         _ => const SettingsPage(),
       };
 
@@ -100,7 +102,7 @@ class _HudShellState extends State<HudShell> implements HudNav {
               painter: BackdropPainter(p),
               child: SafeArea(
                 child: ListenableBuilder(
-                  listenable: Listenable.merge([services.library, services.player, services.settings]),
+                  listenable: Listenable.merge([services.library, services.player, services.settings, services.favorites]),
                   builder: (context, _) => Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                     Expanded(
                       child: Column(children: [

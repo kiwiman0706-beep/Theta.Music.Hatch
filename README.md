@@ -32,12 +32,29 @@ Tailscale 経由で NAS の音楽を再生する Android 音楽プレーヤー�
   - `Music Library.md`（Dataview クエリ付きインデックス）
   - 再書き出ししても、自動生成区間の外に書いたメモや frontmatter に追加した独自キー（`rating:` など）は保持
 
+## お気に入り・音声検索
+
+- **お気に入り**：曲・アルバム・アーティストを ★ で登録（端末内の `favorites.json`。ライブラリを更新しても、
+  WebDAV / DS audio を切り替えても同じ曲なら残る）。お気に入りだけを通しで再生・シャッフルもできる。
+  Obsidian に書き出すと `favorite: true` と `#music/favorite` が付き、曲の表には ★ が付く
+- **音声検索**：Android の音声入力（Google の音声入力画面）で話す。アプリにマイクの権限は要らない
+  - 「宇多田ヒカルをかけて」「Radiohead をシャッフルで再生」→ いちばん近いものをすぐ再生
+  - 「サカナクション」だけなら検索結果を出す。「アーティストの曲名」の言い方もできる
+  - かな/カナ・全角/半角・大文字小文字・空白の違いは無視。音声入力の候補（最大 5 つ）から、いちばん当たるものを選ぶ
+  - 漢字の読みや、英語名をカタカナで認識された場合（「レディオヘッド」→ Radiohead）は当たらないことがある
+
+| 操作 | iPod スキン | Theta スキン |
+|---|---|---|
+| お気に入りに登録・解除 | 中央ボタン長押し（行の長押しも可） | ★ ボタン、または行の長押し |
+| お気に入りを見る | Favorites | FAVS タブ |
+| 音声検索 | MENU 長押し、または Search → Voice Search | 検索欄のマイク（NOW の検索欄はライブラリ全体） |
+
 ## 見た目（スキン）
 
 | スキン | 内容 |
 |---|---|
 | iPod | 上に液晶、下にクリックホイール。Settings → Skin で切り替え |
-| Theta | ThetaHomeHatch と同じ HUD：黒地にオレンジ、細い線、角を落としたボタン、`[ CODE ]` の見出しと四隅のかぎ括弧、右端に縦書きのタブ（NOW / ARTISTS / ALBUMS / SONGS / GENRES / FOLDERS / LIBRARY・SETUP）。テーマは DARK / LIGHT / POP / ALERT / SCI-FI / SYSTEM（配色は ThetaHomeHatch の `Theme.kt` と同じ値）。SETUP → SKIN で切り替え |
+| Theta | ThetaHomeHatch と同じ HUD：黒地にオレンジ、細い線、角を落としたボタン、`[ CODE ]` の見出しと四隅のかぎ括弧、右端に縦書きのタブ（NOW / FAVS / ARTISTS / ALBUMS / SONGS / GENRES / FOLDERS / LIBRARY・SETUP）。テーマは DARK / LIGHT / POP / ALERT / SCI-FI / SYSTEM（配色は ThetaHomeHatch の `Theme.kt` と同じ値）。SETUP → SKIN で切り替え |
 
 Theta スキンの書体 Oswald・Share Tech Mono は SIL Open Font License（`docs/licenses`）。
 
@@ -46,8 +63,8 @@ Theta スキンの書体 Oswald・Share Tech Mono は SIL Open Font License（`d
 | 操作 | 動作 |
 |---|---|
 | リングをなぞる | スクロール（Now Playing では音量） |
-| 中央ボタン | 決定（Now Playing ではシークモード切替） |
-| MENU | 戻る（Android の戻るボタンでも可） |
+| 中央ボタン | 決定（Now Playing ではシークモード切替）。長押しでお気に入り |
+| MENU | 戻る（Android の戻るボタンでも可）。長押しで音声検索 |
 | ▶❚❚ | 再生/一時停止 |
 | ◀◀ / ▶▶ | 前/次の曲、長押しで巻き戻し/早送り |
 
