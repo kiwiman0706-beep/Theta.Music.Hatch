@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app.dart';
+import '../core/clicker.dart';
 import '../core/models.dart';
 import '../core/search.dart';
 import '../core/settings.dart';
@@ -351,9 +352,12 @@ MenuScreen settingsMenu() {
         s.repeat = RepeatSetting.values[(s.repeat.index + 1) % 3];
         save();
       }),
-      MenuItem('Clicker', detail: s.clicker ? 'On' : 'Off', onSelect: () {
+      MenuItem('Clicker', detail: s.clicker ? 'On' : 'Off', onSelect: () async {
         s.clicker = !s.clicker;
         save();
+        // オンにしたら試しに鳴らす
+        if (s.clicker && !await Clicker.test()) nav.toast('クリック音を鳴らせませんでした');
+        if (s.clicker) nav.toast('クリック音はメディアの音量で鳴ります');
       }),
       MenuItem('Haptics', detail: s.haptics ? 'On' : 'Off', onSelect: () {
         s.haptics = !s.haptics;

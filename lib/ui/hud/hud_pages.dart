@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app.dart';
+import '../../core/clicker.dart';
 import '../../core/models.dart';
 import '../../core/search.dart';
 import '../../core/settings.dart';
@@ -1118,7 +1119,13 @@ class SettingsPage extends StatelessWidget {
             _toggleRow(context, 4, 'FAV = RATING', 'お気に入りを DS audio の★評価と同期', s.dsFavRating > 0,
                 () => set(() => s.dsFavRating = switch (s.dsFavRating) { 4 => 5, 5 => 0, 0 => 3, _ => 4 }),
                 value: s.dsFavRating == 0 ? 'OFF' : '★${s.dsFavRating}+'),
-            _toggleRow(context, 5, 'CLICKER', 'カリカリ音（iPod スキン）', s.clicker, () => set(() => s.clicker = !s.clicker)),
+            _toggleRow(context, 5, 'CLICKER', 'カリカリ音（iPod スキン・メディア音量）', s.clicker, () async {
+              set(() => s.clicker = !s.clicker);
+              if (s.clicker) {
+                final ok = await Clicker.test();
+                if (context.mounted) hudToast(context, ok ? 'クリック音はメディアの音量で鳴ります' : 'クリック音を鳴らせませんでした');
+              }
+            }),
             _toggleRow(context, 6, 'HAPTICS', 'ホイールの振動（iPod スキン）', s.haptics, () => set(() => s.haptics = !s.haptics)),
           ]),
         ),

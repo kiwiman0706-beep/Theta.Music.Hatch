@@ -20,7 +20,8 @@ import io.flutter.plugin.common.MethodChannel
 /**
  * バックグラウンド再生（audio_service）の Activity に、音声入力とクリック音を足したもの。
  * 音声入力は端末の音声入力アプリ（Google）に任せるので、このアプリにマイクの権限は要らない。
- * クリック音（iPod のカリカリ）は SoundPool で鳴らす。効果音なので再生中の音楽は止めない。
+ * クリック音（iPod のカリカリ）は SoundPool で鳴らす。SoundPool は音声フォーカスを取らないので、再生中の音楽は止めない。
+ * 音量は「メディア」の音量に従う（システム音扱いだと、マナーモードやタッチ音オフで鳴らない端末があるため）。
  */
 class MainActivity : AudioServiceActivity() {
     private var pending: MethodChannel.Result? = null
@@ -33,10 +34,11 @@ class MainActivity : AudioServiceActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "theta_music/click").setMethodCallHandler { call, result ->
             when (call.method) {
                 "click" -> {
-                    val v = (call.argument<Double>("volume") ?: 0.6).toFloat()
+                    val v = (call.argument<Double>("volume") ?: 0.8).toFloat()
                     clickPool()
-                    if (clickReady) pool?.play(clickId, v, v, 1, 0, 1f)
-                    result.success(null)
+                    // 戻り値: 鳴らせたか（読み込み前・失敗なら false）
+                    val stream = if (clickReady) pool?.play(clickId, v, v, 1, 0, 1f) ?: 0 else 0
+                    result.success(stream != 0)
                 }
                 "prepare" -> {
                     clickPool()
@@ -94,14 +96,14 @@ class MainActivity : AudioServiceActivity() {
             .setMaxStreams(4)
             .setAudioAttributes(
                 AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                     .build(),
             )
             .build()
         p.setOnLoadCompleteListener { _, _, status -> clickReady = status == 0 }
         pool = p
-        val f = File(cacheDir, "ipod_click.wav")
+        val f = File(cacheDir, "ipod_click_v2.wav")
         if (!f.exists()) writeClick(f)
         clickId = p.load(f.path, 1)
     }
@@ -116,15 +118,21 @@ class MainActivity : AudioServiceActivity() {
         private const val REQ_VOICE = 4101
         private const val RATE = 44100
 
-        /** iPod のクリックホイールの「チッ」：数 ms のノイズと高い音を急に減衰させる */
+        /**
+         * iPod のクリックホイールの「チッ」：ノイズと高い音を数 ms で減衰させる。
+         * Android は鳴り始めの数 ms の音量をゆっくり上げるので、頭に無音を置いてから鳴らす
+         * （無音が無いと、短い音はほとんど聞こえなくなる）。
+         */
         private fun writeClick(f: File) {
-            val n = RATE * 8 / 1000
+            val lead = RATE * 15 / 1000
+            val n = lead + RATE * 30 / 1000
             val rnd = Random(7)
             val pcm = ShortArray(n) { i ->
-                val t = i.toDouble() / RATE
-                val env = exp(-t / 0.0011)
-                val v = (rnd.nextDouble() * 2 - 1) * 0.55 + sin(2 * PI * 3100 * t) * 0.45
-                (v * env * 0.9 * Short.MAX_VALUE).toInt().toShort()
+                if (i < lead) return@ShortArray 0
+                val t = (i - lead).toDouble() / RATE
+                val env = exp(-t / 0.0025)
+                val v = (rnd.nextDouble() * 2 - 1) * 0.5 + sin(2 * PI * 3200 * t) * 0.35 + sin(2 * PI * 1600 * t) * 0.15
+                (v * env * 0.95 * Short.MAX_VALUE).toInt().coerceIn(-32767, 32767).toShort()
             }
             val data = n * 2
             val b = ByteBuffer.allocate(44 + data).order(ByteOrder.LITTLE_ENDIAN)
