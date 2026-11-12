@@ -3,8 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 
 import 'app.dart';
+import 'core/shelf.dart';
 import 'ui/hud/hud_shell.dart';
 import 'ui/hud/hud_theme.dart';
+import 'ui/screens.dart' show nav;
 import 'ui/shell.dart';
 
 Future<void> main() async {
@@ -17,6 +19,21 @@ Future<void> main() async {
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   services = await Services.create();
   runApp(const ThetaMusicApp());
+  // Theta Home の棚から押されたら、そのアルバム・アーティストを再生
+  ShelfWriter.listen((kind, key) {
+    final r = ShelfWriter.resolve(services.library, services.favorites, kind, key);
+    if (r == null) return;
+    services.player.playList(r.$1, 0, shuffle: r.$2);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      try {
+        if (services.settings.skin == 'theta') {
+          hudNav.selectTab(nowTab);
+        } else {
+          nav.showNowPlaying();
+        }
+      } catch (_) {}
+    });
+  });
 }
 
 class ThetaMusicApp extends StatelessWidget {

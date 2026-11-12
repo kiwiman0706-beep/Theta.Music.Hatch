@@ -1127,6 +1127,10 @@ class SettingsPage extends StatelessWidget {
               }
             }),
             _toggleRow(context, 6, 'HAPTICS', 'ホイールの振動（iPod スキン）', s.haptics, () => set(() => s.haptics = !s.haptics)),
+            _toggleRow(context, 7, 'HOME: FAVORITES', 'Theta Home の棚にお気に入りを出す', s.shelfFavorites,
+                () => set(() => s.shelfFavorites = !s.shelfFavorites)),
+            _toggleRow(context, 8, 'HOME: RECENT', 'Theta Home の棚に最近再生したアルバムを出す', s.shelfRecent,
+                () => set(() => s.shelfRecent = !s.shelfRecent)),
           ]),
         ),
       ),

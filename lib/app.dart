@@ -6,6 +6,7 @@ import 'core/obsidian.dart';
 import 'core/player.dart';
 import 'core/scanner.dart';
 import 'core/settings.dart';
+import 'core/shelf.dart';
 
 /// アプリ全体のサービス（シングルトン）
 class Services {
@@ -17,8 +18,11 @@ class Services {
   final Player player;
   final ObsidianExporter obsidian;
   final Favorites favorites;
+  final Recents recents;
+  final ShelfWriter shelf;
 
-  Services._(this.settings, this.library, this.ds, this.scanner, this.art, this.player, this.obsidian, this.favorites);
+  Services._(this.settings, this.library, this.ds, this.scanner, this.art, this.player, this.obsidian, this.favorites,
+      this.recents, this.shelf);
 
   static Future<Services> create() async {
     final settings = AppSettings();
@@ -29,18 +33,29 @@ class Services {
     final art = ArtCache(settings, ds);
     final favorites = Favorites(library, favRating: () => settings.dsFavRating, setRating: ds.setRating);
     await favorites.load();
+    final recents = Recents();
+    await recents.load();
+    final player = Player(settings, art, ds);
+    // 再生したアルバムを覚える（Home の棚の「最近再生」）
+    player.addListener(() {
+      final t = player.current;
+      if (t != null && player.playing) recents.played(t);
+    });
+    final shelf = ShelfWriter(settings, library, favorites, recents, art.load)..start();
     return Services._(
       settings,
       library,
       ds,
       Scanner(settings, library, ds),
       art,
-      Player(settings, art, ds),
+      player,
       // DS audio のときは File Station、WebDAV のときは WebDAV で Vault に書く
       ObsidianExporter(settings, library,
           () => settings.source == MusicSource.dsaudio ? ds : settings.client(),
           favorites: favorites),
       favorites,
+      recents,
+      shelf,
     );
   }
 }

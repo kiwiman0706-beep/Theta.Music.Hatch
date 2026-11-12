@@ -44,6 +44,14 @@
                 <action android:name="android.intent.action.MEDIA_BUTTON"/>
             </intent-filter>
         </receiver>
+        <!-- Theta Home の棚（Theta.Hatch.Series spec/THETA_SHARED_SETTINGS.md §4.2）。
+             権限 app.thetahatch.permission.SHARE の定義は、共通鍵で署名するときだけ src/series/ から足す -->
+        <provider
+            android:name=".ShelfProvider"
+            android:authorities="${applicationId}.theta"
+            android:exported="true"
+            android:readPermission="app.thetahatch.permission.SHARE"
+            android:writePermission="app.thetahatch.permission.SHARE" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

@@ -52,6 +52,11 @@ android {
             signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
+
+    // シリーズの権限（app.thetahatch.permission.SHARE）の定義は、本番の鍵で署名するときだけ入れる
+    if (signingConfigs.findByName("release") != null) {
+        sourceSets.getByName("release").manifest.srcFile("src/series/AndroidManifest.xml")
+    }
 }
 
 kotlin {

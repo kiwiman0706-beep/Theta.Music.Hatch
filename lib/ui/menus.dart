@@ -363,6 +363,15 @@ MenuScreen settingsMenu() {
         s.haptics = !s.haptics;
         save();
       }),
+      // Theta Home の棚に出すもの
+      MenuItem('Home: Favorites', detail: s.shelfFavorites ? 'On' : 'Off', onSelect: () {
+        s.shelfFavorites = !s.shelfFavorites;
+        save();
+      }),
+      MenuItem('Home: Recent', detail: s.shelfRecent ? 'On' : 'Off', onSelect: () {
+        s.shelfRecent = !s.shelfRecent;
+        save();
+      }),
       if (s.source == MusicSource.dsaudio)
         MenuItem('Fav = Rating', detail: s.dsFavRating == 0 ? 'Off' : '★${s.dsFavRating}+', onSelect: () {
           // DS audio の★評価との同期: ★4以上 → ★5 だけ → 同期しない → ★3以上

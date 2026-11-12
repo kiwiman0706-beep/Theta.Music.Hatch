@@ -4,6 +4,8 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.media.AudioAttributes
 import android.media.SoundPool
+import android.net.Uri
+import android.os.Bundle
 import android.speech.RecognizerIntent
 import java.io.File
 import java.io.FileOutputStream
@@ -28,9 +30,43 @@ class MainActivity : AudioServiceActivity() {
     private var pool: SoundPool? = null
     private var clickId = 0
     private var clickReady = false
+    private var shelf: MethodChannel? = null
+    /** Theta Home の棚から押されて起動したとき、Dart が読むまで預かる */
+    private var initialPlay: Map<String, String>? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        if (savedInstanceState == null) initialPlay = playArgs(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        playArgs(intent)?.let { shelf?.invokeMethod("play", it) }
+    }
+
+    private fun playArgs(i: Intent?): Map<String, String>? {
+        if (i?.action != ACTION_PLAY) return null
+        return mapOf("kind" to (i.getStringExtra("kind") ?: ""), "key" to (i.getStringExtra("key") ?: ""))
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        shelf = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "theta_music/shelf").apply {
+            setMethodCallHandler { call, result ->
+                when (call.method) {
+                    // 棚の中身が変わった → Home に読み直してもらう
+                    "changed" -> {
+                        contentResolver.notifyChange(Uri.parse("content://$packageName.theta/shelf"), null)
+                        result.success(null)
+                    }
+                    "initial" -> {
+                        result.success(initialPlay)
+                        initialPlay = null
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+        }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "theta_music/click").setMethodCallHandler { call, result ->
             when (call.method) {
                 "click" -> {
@@ -116,6 +152,8 @@ class MainActivity : AudioServiceActivity() {
 
     companion object {
         private const val REQ_VOICE = 4101
+        /** Theta Home の棚から「再生」（extra: kind = album / artist / favsongs、key） */
+        const val ACTION_PLAY = "app.thetahatch.music.PLAY"
         private const val RATE = 44100
 
         /**
