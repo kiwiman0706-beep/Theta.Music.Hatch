@@ -11,6 +11,7 @@ import 'package:theta_music/core/scanner.dart';
 import 'package:theta_music/core/settings.dart';
 
 void main() {
+  AppSettings.secure = null; // テストでは暗号化した保存先を使わない
   final url = Platform.environment['DAV_URL'];
   test('scan + obsidian export against WebDAV', () async {
     SharedPreferences.setMockInitialValues({

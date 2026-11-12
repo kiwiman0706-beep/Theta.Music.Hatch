@@ -15,6 +15,7 @@ Track t(String artist, String album, String title, int no) => Track(
     trackNo: no, artPath: '/music/$artist/$album/cover.jpg');
 
 void main() {
+  AppSettings.secure = null; // テストでは暗号化した保存先を使わない
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('shelf: favorites and recent albums, with art files and resolvable keys', () async {

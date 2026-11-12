@@ -113,15 +113,39 @@ class BackdropPainter extends CustomPainter {
       for (var y = 0.0; y < size.height; y += 4) {
         canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
       }
-    } else if (p.backdrop == 'grid') {
+    } else if (p.backdrop == 'grid' || p.backdrop == 'lines') {
+      // grid：widget の 7%・28dp、lines（WINDOW）：白の 22%・36dp
+      final lines = p.backdrop == 'lines';
+      final step = lines ? 36.0 : 28.0;
       final paint = Paint()
-        ..color = p.widget.withValues(alpha: 0.07)
+        ..color = lines ? const Color(0x38FFFFFF) : p.widget.withValues(alpha: 0.07)
         ..strokeWidth = 1;
-      for (var x = 0.0; x < size.width; x += 28) {
+      for (var x = 0.0; x < size.width; x += step) {
         canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
       }
-      for (var y = 0.0; y < size.height; y += 28) {
+      for (var y = 0.0; y < size.height; y += step) {
         canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+      }
+    } else if (p.backdrop == 'pixel') {
+      // LCD：fg の 3.5%、3dp ごとの横線
+      final paint = Paint()
+        ..color = p.fg.withValues(alpha: 0.035)
+        ..strokeWidth = 1;
+      for (var y = 0.0; y < size.height; y += 3) {
+        canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+      }
+    } else if (p.backdrop == 'rain') {
+      // TERMINAL：18dp ごとの列に accent の点（流れる文字の列の代わりに、決まった並びの点）
+      final paint = Paint();
+      var seed = 7;
+      for (var x = 9.0; x < size.width; x += 18) {
+        for (var y = 0.0; y < size.height; y += 14) {
+          seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+          final a = (seed % 100) / 1000.0; // 0〜10%
+          if (a < 0.03) continue;
+          paint.color = p.accent.withValues(alpha: a);
+          canvas.drawRect(Rect.fromLTWH(x, y, 2, 6), paint);
+        }
       }
     }
   }
@@ -172,11 +196,11 @@ class HudPanel extends StatelessWidget {
       final band = switch (code.hashCode % 3) { 0 => p.accent, 1 => p.accent3, _ => p.accent2 };
       final onBand = band == p.accent ? p.onAccent : p.fg;
       return PopShadow(
-        radius: 10,
+        radius: p.radius,
         child: Container(
           decoration: BoxDecoration(
             color: p.panel,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(p.radius),
             border: Border.all(color: p.line, width: p.lineWidth),
           ),
           clipBehavior: Clip.antiAlias,
@@ -198,9 +222,13 @@ class HudPanel extends StatelessWidget {
       );
     }
     return CustomPaint(
-      foregroundPainter: CornersPainter(p.accent),
+      // 角丸のスキン（TERMINAL・LCD）にはかぎ括弧を付けない
+      foregroundPainter: p.rounded ? null : CornersPainter(p.accent),
       child: Container(
-        decoration: BoxDecoration(border: Border.all(color: p.line)),
+        decoration: BoxDecoration(
+          border: Border.all(color: p.line, width: p.lineWidth),
+          borderRadius: p.rounded ? BorderRadius.circular(p.radius) : null,
+        ),
         padding: padding,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -232,11 +260,17 @@ class PopShadow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = HudScope.of(context);
-    if (!p.pop) return child;
+    // hard：右下 3dp の fg 色の影（POP・WINDOW）、soft：ぼかした浮き出し（BRAUN・SOFT）
+    if (p.shadow == 'none') return child;
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(radius),
-        boxShadow: [BoxShadow(color: p.fg, offset: const Offset(3, 3))],
+        boxShadow: p.shadow == 'hard'
+            ? [BoxShadow(color: p.fg, offset: const Offset(3, 3))]
+            : [
+                BoxShadow(color: Colors.black.withValues(alpha: 0.14), offset: const Offset(3, 4), blurRadius: 10),
+                const BoxShadow(color: Color(0x99FFFFFF), offset: Offset(-2, -2), blurRadius: 6),
+              ],
       ),
       child: child,
     );

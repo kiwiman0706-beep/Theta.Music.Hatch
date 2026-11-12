@@ -1,4 +1,4 @@
-package com.thetahatch.theta_music
+package app.thetahatch.music
 
 import android.content.ContentProvider
 import android.content.ContentValues

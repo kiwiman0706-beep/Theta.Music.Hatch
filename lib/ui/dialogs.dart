@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app.dart';
 import '../core/dsaudio.dart';
+import '../core/series.dart';
 import '../core/settings.dart';
 import '../core/webdav.dart';
 
@@ -18,6 +19,8 @@ Future<void> showServerDialog(BuildContext context) {
   var transcode = s.dsTranscode;
   String? result;
   bool testing = false;
+  String? hubDid; // ハブから受け取ったデバイストークン
+  final hub = Series.hub();
 
   return showDialog<void>(
     context: context,
@@ -33,6 +36,10 @@ Future<void> showServerDialog(BuildContext context) {
         s.dsTranscode = transcode;
         if (changed) {
           s.dsDid = '';
+          services.ds.reset();
+        }
+        if (hubDid != null) {
+          s.dsDid = hubDid!;
           services.ds.reset();
         }
         if (otp.text.trim().isNotEmpty) services.ds.setOtp(otp.text);
@@ -72,6 +79,50 @@ Future<void> showServerDialog(BuildContext context) {
         title: const Text('接続先'),
         content: SingleChildScrollView(
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            // 同じ端末の Theta Home Hatch（設定のハブ）から NAS の設定を受け取る（spec THETA_SHARED_SETTINGS §4.0・§4.1）
+            FutureBuilder<String>(
+              future: hub,
+              builder: (context, snap) {
+                final h = snap.data ?? '';
+                if (h.isEmpty) return const SizedBox.shrink();
+                final name = h.endsWith('kidshome') ? 'Theta KidsHome Hatch' : 'Theta Home Hatch';
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.home_outlined),
+                    label: Text('$name の NAS の設定を使う'),
+                    onPressed: testing
+                        ? null
+                        : () async {
+                            setState(() {
+                              testing = true;
+                              result = null;
+                            });
+                            try {
+                              final info = await Series.info();
+                              final nasUrl = info['nas.url'] ?? '';
+                              if (nasUrl.isEmpty) throw Exception('$name に NAS が登録されていません');
+                              final pw = await Series.secret('nas.password');
+                              var did = '';
+                              try {
+                                did = await Series.secret('nas.deviceToken');
+                              } catch (_) {}
+                              // ハブの nas.url は DSM の URL なので DS audio で使う（WebDAV にも切り替えられる）
+                              source = MusicSource.dsaudio;
+                              dsUrl.text = nasUrl;
+                              if ((info['nas.user'] ?? '').isNotEmpty) user.text = info['nas.user']!;
+                              if (pw.isNotEmpty) pass.text = pw;
+                              hubDid = did;
+                              result = 'OK: $name から受け取りました（保存で反映）';
+                            } catch (e) {
+                              result = 'NG: $e';
+                            }
+                            setState(() => testing = false);
+                          },
+                  ),
+                );
+              },
+            ),
             SegmentedButton<MusicSource>(
               segments: const [
                 ButtonSegment(value: MusicSource.webdav, label: Text('WebDAV')),

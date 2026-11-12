@@ -1,4 +1,4 @@
-package com.thetahatch.theta_music
+package app.thetahatch.music
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
@@ -51,6 +51,7 @@ class MainActivity : AudioServiceActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "theta_music/series").setMethodCallHandler(Series.handler(this))
         shelf = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "theta_music/shelf").apply {
             setMethodCallHandler { call, result ->
                 when (call.method) {

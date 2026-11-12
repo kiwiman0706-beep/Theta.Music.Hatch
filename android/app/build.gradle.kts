@@ -13,7 +13,7 @@ val keyProps = Properties().apply {
 }
 
 android {
-    namespace = "com.thetahatch.theta_music"
+    namespace = "app.thetahatch.music"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -23,7 +23,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.thetahatch.theta_music"
+        applicationId = "app.thetahatch.music"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -36,8 +36,19 @@ android {
         versionName = flutter.versionName
     }
 
+    // シリーズ共通の鍵（Theta.Hatch.Series secrets/README.md）で署名する。
+    // CI：Secret 4 つ（release.yml が鍵を SIGNING_FILE に書き出す）。手元：android/key.properties（Git 管理外）。
+    // どちらも無ければデバッグ鍵（ハブからは入らない・Home の棚も読めない）。別名はここに書かない。
+    val signingFile = System.getenv("SIGNING_FILE")
     signingConfigs {
-        if (keyProps.containsKey("storeFile")) {
+        if (!signingFile.isNullOrEmpty()) {
+            create("release") {
+                storeFile = file(signingFile)
+                storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword = System.getenv("ANDROID_KEY_PASSWORD") ?: System.getenv("ANDROID_KEYSTORE_PASSWORD")
+            }
+        } else if (keyProps.containsKey("storeFile")) {
             create("release") {
                 storeFile = file(keyProps.getProperty("storeFile"))
                 storePassword = keyProps.getProperty("storePassword")

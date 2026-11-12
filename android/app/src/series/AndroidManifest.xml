@@ -4,5 +4,4 @@
     <permission
         android:name="app.thetahatch.permission.SHARE"
         android:protectionLevel="signature" />
-    <uses-permission android:name="app.thetahatch.permission.SHARE" />
 </manifest>

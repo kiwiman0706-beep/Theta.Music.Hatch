@@ -1,20 +1,29 @@
 import 'package:flutter/material.dart';
 
-/// ThetaHomeHatch と同じ配色（app/src/main/java/.../ui/Theme.kt を移植）。
-/// 計器盤（HUD）風：黒地にオレンジ 1 色、細い線、四角い角。
+import 'skins.g.dart';
+
+/// Theta Hatch シリーズのスキン（正本は Theta.Hatch.Series の `design/skins/skins.json`。
+/// 値は `skins.g.dart` に生成：`python tool/gen_skins.py <skins.json>`）。
+/// 基本は計器盤（HUD）風：黒地にオレンジ 1 色、細い線、四角い角。
 @immutable
 class Palette {
   final Color bg, panel, raised, fg, muted, faint, line, accent, onAccent, widget, launch, zebra;
 
-  /// POP（カラフル）：角を丸め、線を太く、ボタンに影、書体はゴシック
+  /// POP 系（pop・braun・soft・window）：角を丸め、見出しを色の帯に、ボタンに影、書体はゴシック
   final bool pop;
   final Color accent2, accent3;
 
-  /// 背景の模様：'' / 'scan'（走査線、ALERT） / 'grid'（方眼、SCI-FI）
+  /// 背景の模様：'' / scan（走査線） / grid（方眼） / rain（流れる文字） / lines（白い方眼） / pixel（液晶の横線）
   final String backdrop;
 
   /// 見出しの上の警告の帯の太さ
   final double hazard;
+
+  /// 作り（hud・pop・term・braun・soft・window・lcd）、角丸、書体（hud・sans・mono）、影（none・hard・soft）
+  final String style;
+  final double radius;
+  final String font;
+  final String shadow;
 
   const Palette({
     required this.bg,
@@ -34,6 +43,10 @@ class Palette {
     Color? accent3,
     this.backdrop = '',
     this.hazard = 4,
+    this.style = 'hud',
+    this.radius = 0,
+    this.font = 'hud',
+    this.shadow = 'none',
   })  : accent2 = accent2 ?? accent,
         accent3 = accent3 ?? accent;
 
@@ -42,16 +55,21 @@ class Palette {
 
   bool get isDark => bg.computeLuminance() < 0.5;
 
-  /// 見出し・数字は Oswald、ラベルは等幅の Share Tech Mono。POP は端末のゴシック。日本語は端末の書体。
-  String? get display => pop ? null : 'Oswald';
-  String? get mono => pop ? null : 'ShareTechMono';
-  double get lineWidth => pop ? 1.5 : 1;
+  /// 見出し・数字：hud は Oswald、mono は Share Tech Mono、sans は端末のゴシック。日本語は端末の書体
+  String? get display => switch (font) { 'hud' => 'Oswald', 'mono' => 'ShareTechMono', _ => null };
 
-  /// ボタン・入力欄の形：HUD は左上を落とした角、POP は少し丸めた角
+  /// ラベル・ボタン：hud・mono は Share Tech Mono、sans は端末のゴシック
+  String? get mono => font == 'sans' ? null : 'ShareTechMono';
+  double get lineWidth => shadow == 'hard' ? 1.5 : 1;
+
+  /// 角丸（POP 系・term・lcd）か、左上を落とした角（HUD）か
+  bool get rounded => radius > 0;
+
+  /// ボタン・入力欄の形：HUD は左上を落とした角、ほかは角丸
   ShapeBorder shape({Color? side}) {
     final bs = side == null ? BorderSide.none : BorderSide(color: side, width: lineWidth);
-    return pop
-        ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: bs)
+    return rounded
+        ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius > 10 ? radius * 0.7 : 8), side: bs)
         : BeveledRectangleBorder(borderRadius: const BorderRadius.only(topLeft: Radius.circular(8)), side: bs);
   }
 }
@@ -71,92 +89,12 @@ const darkPalette = Palette(
   zebra: Color(0x0FFFFFFF),
 );
 
-/// 明るい地の計器盤：紙のような地に墨色の文字、オレンジは濃いめ
-const lightPalette = Palette(
-  bg: Color(0xFFF4F3EE),
-  panel: Color(0xFFFFFFFF),
-  raised: Color(0xFFE9E8E2),
-  fg: Color(0xFF121212),
-  muted: Color(0xFF474747),
-  faint: Color(0xFF5E5E5E),
-  line: Color(0xFFBDBCB4),
-  accent: Color(0xFFB8400C),
-  onAccent: Color(0xFFFFFFFF),
-  widget: Color(0xFF121212),
-  launch: Color(0xFF6A6A6A),
-  zebra: Color(0x0D000000),
-);
+/// 設定で選べるスキン（ui.skin）
+const hudThemes = skinNames;
 
-/// POP：クリームの地に墨色の太い線、コーラル・イエロー・ミント
-const popPalette = Palette(
-  bg: Color(0xFFFAF6EC),
-  panel: Color(0xFFFFFFFF),
-  raised: Color(0xFFF2EDE0),
-  fg: Color(0xFF2B2B2B),
-  muted: Color(0xFF4F4F4F),
-  faint: Color(0xFF6B6B6B),
-  line: Color(0xFF2B2B2B),
-  accent: Color(0xFFEF6F51),
-  onAccent: Color(0xFFFFFFFF),
-  widget: Color(0xFF7FCFB5),
-  launch: Color(0xFFF2BE2E),
-  zebra: Color(0x26F5C842),
-  pop: true,
-  accent2: Color(0xFFF5C842),
-  accent3: Color(0xFFA8E2CF),
-);
-
-/// ALERT：警報画面ふう。黒地に橙、警告の赤と正常の緑、太い警告の帯と走査線
-const alertPalette = Palette(
-  bg: Color(0xFF050404),
-  panel: Color(0xFF0D0908),
-  raised: Color(0xFF1A110C),
-  fg: Color(0xFFFFD9B0),
-  muted: Color(0xFFD6955C),
-  faint: Color(0xFF9C6A42),
-  line: Color(0xFF5C3418),
-  accent: Color(0xFFFF7A00),
-  onAccent: Color(0xFF050404),
-  widget: Color(0xFFFF2A2A),
-  launch: Color(0xFF39E07A),
-  zebra: Color(0x14FF7A00),
-  accent2: Color(0xFFFF2A2A),
-  accent3: Color(0xFF39E07A),
-  backdrop: 'scan',
-  hazard: 10,
-);
-
-/// SCI-FI：操作卓ふう。黒に近い青緑の地に方眼、黄・水色・緑
-const sciFiPalette = Palette(
-  bg: Color(0xFF060C0E),
-  panel: Color(0xFF0B1519),
-  raised: Color(0xFF112128),
-  fg: Color(0xFFDDF6FF),
-  muted: Color(0xFF8FB8C4),
-  faint: Color(0xFF5F8794),
-  line: Color(0xFF1F3C46),
-  accent: Color(0xFFF2E21B),
-  onAccent: Color(0xFF060C0E),
-  widget: Color(0xFF3FD0E8),
-  launch: Color(0xFF7BE38B),
-  zebra: Color(0x123FD0E8),
-  accent2: Color(0xFF3FD0E8),
-  accent3: Color(0xFF7BE38B),
-  backdrop: 'grid',
-  hazard: 6,
-);
-
-const hudThemes = ['dark', 'light', 'pop', 'alert', 'scifi', 'system'];
-
-/// テーマ名から配色を決める。'system' は端末のダーク・ライトに合わせる
-Palette paletteFor(String mode, Brightness system) => switch (mode) {
-      'pop' => popPalette,
-      'alert' => alertPalette,
-      'scifi' => sciFiPalette,
-      'light' => lightPalette,
-      'dark' => darkPalette,
-      _ => system == Brightness.dark ? darkPalette : lightPalette,
-    };
+/// スキン名から配色を決める。'system' と知らない名前は端末のダーク・ライトに合わせる
+Palette paletteFor(String mode, Brightness system) =>
+    skinPalettes[mode] ?? skinPalettes[system == Brightness.dark ? 'dark' : 'light'] ?? darkPalette;
 
 class HudScope extends InheritedWidget {
   final Palette palette;
@@ -185,7 +123,7 @@ ThemeData hudMaterialTheme(Palette p) {
     onSurfaceVariant: p.muted,
     outline: p.line,
   );
-  final r = p.pop ? 10.0 : 0.0;
+  final r = p.radius;
   return ThemeData(
     colorScheme: scheme,
     useMaterial3: true,

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'webdav.dart';
@@ -10,6 +11,11 @@ enum MusicSource { webdav, dsaudio }
 
 class AppSettings extends ChangeNotifier {
   late SharedPreferences _p;
+
+  /// パスワード・デバイストークンは端末内で暗号化して持つ（Android Keystore）。
+  /// テストでは null（SharedPreferences のモックに入れる）
+  static FlutterSecureStorage? secure = const FlutterSecureStorage();
+  static const _secretKeys = ['password', 'dsDid'];
 
   String serverUrl = '';
   String user = '';
@@ -38,8 +44,11 @@ class AppSettings extends ChangeNotifier {
   /// 見た目: ipod（クリックホイール） / theta（ThetaHomeHatch の HUD）
   String skin = 'ipod';
 
-  /// theta スキンのテーマ: dark / light / pop / alert / scifi / system
-  String hudTheme = 'dark';
+  /// theta スキンのテーマ（シリーズの ui.skin）: system / dark / light / pop / alert / scifi / term / braun / soft / window / lcd
+  String hudTheme = 'system';
+
+  /// スキンをシリーズ（Theta Home Hatch の ui.skin）に合わせる
+  bool followSeriesSkin = true;
 
   Future<void> load() async {
     _p = await SharedPreferences.getInstance();
@@ -62,7 +71,29 @@ class AppSettings extends ChangeNotifier {
     dsDid = _p.getString('dsDid') ?? '';
     dsTranscode = _p.getBool('dsTranscode') ?? false;
     skin = _p.getString('skin') ?? 'ipod';
-    hudTheme = _p.getString('hudTheme') ?? 'dark';
+    hudTheme = _p.getString('hudTheme') ?? 'system';
+    followSeriesSkin = _p.getBool('followSeriesSkin') ?? true;
+    await _loadSecrets();
+  }
+
+  Future<void> _loadSecrets() async {
+    final sec = secure;
+    if (sec == null) return;
+    for (final k in _secretKeys) {
+      try {
+        // 前の版は SharedPreferences に平文で持っていたので、暗号化した方へ移す
+        final old = _p.getString(k);
+        if (old != null) {
+          if (old.isNotEmpty) await sec.write(key: k, value: old);
+          await _p.remove(k);
+        }
+        final v = await sec.read(key: k) ?? '';
+        if (k == 'password') password = v;
+        if (k == 'dsDid') dsDid = v;
+      } catch (e) {
+        debugPrint('secure storage: $e');
+      }
+    }
   }
 
   bool get configured => source == MusicSource.dsaudio ? dsUrl.isNotEmpty : serverUrl.isNotEmpty;
@@ -72,7 +103,7 @@ class AppSettings extends ChangeNotifier {
   Future<void> save() async {
     await _p.setString('serverUrl', serverUrl);
     await _p.setString('user', user);
-    await _p.setString('password', password);
+    if (secure == null) await _p.setString('password', password);
     await _p.setString('musicPath', musicPath);
     await _p.setString('obsidianPath', obsidianPath);
     await _p.setBool('readTags', readTags);
@@ -86,10 +117,20 @@ class AppSettings extends ChangeNotifier {
     await _p.setInt('repeat', repeat.index);
     await _p.setInt('source', source.index);
     await _p.setString('dsUrl', dsUrl);
-    await _p.setString('dsDid', dsDid);
+    if (secure == null) await _p.setString('dsDid', dsDid);
+    final sec = secure;
+    if (sec != null) {
+      try {
+        await sec.write(key: 'password', value: password);
+        await sec.write(key: 'dsDid', value: dsDid);
+      } catch (e) {
+        debugPrint('secure storage: $e');
+      }
+    }
     await _p.setBool('dsTranscode', dsTranscode);
     await _p.setString('skin', skin);
     await _p.setString('hudTheme', hudTheme);
+    await _p.setBool('followSeriesSkin', followSeriesSkin);
     notifyListeners();
   }
 }

@@ -4,6 +4,7 @@ import '../app.dart';
 import '../core/clicker.dart';
 import '../core/models.dart';
 import '../core/search.dart';
+import '../core/series.dart';
 import '../core/settings.dart';
 import '../core/voice.dart';
 import 'dialogs.dart';
@@ -388,6 +389,23 @@ MenuScreen settingsMenu() {
       }),
       MenuItem('Obsidian Folder', detail: s.obsidianPath.isEmpty ? '未設定' : null, chevron: true,
           onSelect: () => showObsidianDialog(nav.context)),
+      MenuItem('Check for Updates', onSelect: () async {
+        nav.toast('確認中…');
+        final now = await Series.version();
+        final l = await Series.latest();
+        if (l == null) {
+          nav.toast('新しい版を調べられませんでした');
+        } else if (now.isNotEmpty && Series.newer(l, now)) {
+          nav.toast('新しい版 $l があります（Update で更新）');
+        } else {
+          nav.toast('最新です（$now）');
+        }
+      }),
+      // 更新はハブ（Theta Home Hatch）に頼む。無ければ Releases ページ（spec §6.1）
+      MenuItem('Update', onSelect: () async {
+        final how = await Series.requestUpdate().catchError((_) => '');
+        if (how == 'browser') nav.toast('Releases ページを開きました');
+      }),
       MenuItem('About', chevron: true, onSelect: () => nav.push(aboutScreen())),
     ],
     deps: [s],
@@ -397,8 +415,12 @@ MenuScreen settingsMenu() {
 InfoScreen aboutScreen() => InfoScreen('About', (context) {
       final l = services.library;
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Theta Music', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-        const Text('NAS (WebDAV) + Tailscale player', style: TextStyle(fontSize: 12, color: LcdColors.sub)),
+        const Text('Theta Music Hatch', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        const Text('NAS (WebDAV / DS audio) + Tailscale', style: TextStyle(fontSize: 12, color: LcdColors.sub)),
+        FutureBuilder<String>(
+          future: Series.version(),
+          builder: (context, v) => Text('Version: ${v.data ?? ''}'),
+        ),
         const SizedBox(height: 10),
         Text('Songs: ${l.tracks.length}'),
         Text('Albums: ${l.albums.length}'),

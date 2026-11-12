@@ -12,13 +12,16 @@ import 'ui/shell.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await JustAudioBackground.init(
-    androidNotificationChannelId: 'com.thetahatch.theta_music.playback',
+    androidNotificationChannelId: 'app.thetahatch.music.playback',
     androidNotificationChannelName: 'Playback',
     androidNotificationOngoing: true,
   );
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   services = await Services.create();
   runApp(const ThetaMusicApp());
+  // スキンはシリーズ（Theta Home Hatch の ui.skin）に合わせる
+  services.syncFromHub();
+  AppLifecycleListener(onResume: services.syncFromHub);
   // Theta Home の棚から押されたら、そのアルバム・アーティストを再生
   ShelfWriter.listen((kind, key) {
     final r = ShelfWriter.resolve(services.library, services.favorites, kind, key);
@@ -49,7 +52,7 @@ class ThetaMusicApp extends StatelessWidget {
         if (s.skin == 'theta') {
           return MaterialApp(
             key: const ValueKey('theta'),
-            title: 'Theta Music',
+            title: 'Theta Music Hatch',
             debugShowCheckedModeBanner: false,
             theme: hudMaterialTheme(paletteFor(s.hudTheme, Brightness.light)),
             darkTheme: hudMaterialTheme(paletteFor(s.hudTheme, Brightness.dark)),
@@ -59,7 +62,7 @@ class ThetaMusicApp extends StatelessWidget {
         }
         return MaterialApp(
           key: const ValueKey('ipod'),
-          title: 'Theta Music',
+          title: 'Theta Music Hatch',
           debugShowCheckedModeBanner: false,
           theme: ThemeData(colorSchemeSeed: const Color(0xFF1C66D0), useMaterial3: true),
           home: const IPodShell(),

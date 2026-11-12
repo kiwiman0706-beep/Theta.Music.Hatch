@@ -4,6 +4,7 @@ import '../../app.dart';
 import '../../core/clicker.dart';
 import '../../core/models.dart';
 import '../../core/search.dart';
+import '../../core/series.dart';
 import '../../core/settings.dart';
 import '../../core/voice.dart';
 import '../dialogs.dart';
@@ -1097,8 +1098,16 @@ class SettingsPage extends StatelessWidget {
             const SizedBox(height: 6),
             Wrap(spacing: 8, runSpacing: 8, children: [
               for (final t in hudThemes)
-                choice(t == 'scifi' ? 'SCI-FI' : t.toUpperCase(), s.hudTheme == t, () => set(() => s.hudTheme = t)),
+                choice(switch (t) { 'scifi' => 'SCI-FI', 'term' => 'TERMINAL', _ => t.toUpperCase() }, s.hudTheme == t,
+                    () {
+                  set(() => s.hudTheme = t);
+                  // シリーズに合わせるなら、Home にも同じスキンを伝える（ui.skin）
+                  if (s.followSeriesSkin) Series.tell('ui.skin', t);
+                }),
             ]),
+            const SizedBox(height: 4),
+            _toggleRow(context, 0, 'FOLLOW HOME', 'スキンをシリーズ（Theta Home Hatch）に合わせる', s.followSeriesSkin,
+                () => set(() => s.followSeriesSkin = !s.followSeriesSkin)),
           ]),
         ),
       ),
@@ -1143,6 +1152,8 @@ class SettingsPage extends StatelessWidget {
             Text('THETA MUSIC HATCH',
                 style: TextStyle(color: p.fg, fontSize: 20, fontFamily: p.display, letterSpacing: 1)),
             const Note('NAS（WebDAV / DS audio）を Tailscale 経由で再生します。見出しの書体は Oswald・Share Tech Mono（SIL OFL）。'),
+            const SizedBox(height: 6),
+            const _UpdateBox(),
           ]),
         ),
       ),
@@ -1384,6 +1395,65 @@ class _SearchPageState extends State<SearchPage> {
         child: Note('マイクで「〇〇をかけて」「〇〇をシャッフルで再生」と言うと、すぐに流します。'
             '「アーティストの曲名」の言い方もできます。'),
       ),
+    ]);
+  }
+}
+
+/// 今の版・新しい版と「更新する」（更新はハブに頼む。無ければ Releases ページ。spec §6.1）
+class _UpdateBox extends StatefulWidget {
+  const _UpdateBox();
+  @override
+  State<_UpdateBox> createState() => _UpdateBoxState();
+}
+
+class _UpdateBoxState extends State<_UpdateBox> {
+  String _version = '';
+  String? _latest;
+  bool _checking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Series.version().then((v) {
+      if (mounted) setState(() => _version = v);
+    });
+  }
+
+  Future<void> _check() async {
+    setState(() => _checking = true);
+    final l = await Series.latest();
+    if (!mounted) return;
+    setState(() {
+      _checking = false;
+      _latest = l ?? '';
+    });
+    if (l == null) hudToast(context, '新しい版を調べられませんでした');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasNew = (_latest ?? '').isNotEmpty && _version.isNotEmpty && Series.newer(_latest!, _version);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(children: [
+        Expanded(child: ReadoutBox('VERSION', _version.isEmpty ? '—' : _version)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: ReadoutBox('LATEST', _latest == null ? '未確認' : (_latest!.isEmpty ? '—' : _latest!), accent: hasNew),
+        ),
+      ]),
+      const SizedBox(height: 8),
+      Wrap(spacing: 10, runSpacing: 10, children: [
+        PillButton(text: _checking ? '確認中…' : '更新を確認', icon: Icons.refresh, onTap: _checking ? null : _check),
+        PillButton(
+          text: '更新する',
+          icon: Icons.system_update_alt,
+          primary: hasNew,
+          onTap: () async {
+            final how = await Series.requestUpdate().catchError((_) => '');
+            if (context.mounted && how == 'browser') hudToast(context, 'Theta Home Hatch が無いので、Releases ページを開きました');
+          },
+        ),
+      ]),
     ]);
   }
 }

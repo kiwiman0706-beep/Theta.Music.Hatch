@@ -4,8 +4,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- シリーズのハブ（Home・KidsHome）の設定を読む（共通鍵のアプリ同士）。権限の定義は src/series/ -->
+    <uses-permission android:name="app.thetahatch.permission.SHARE"/>
     <application
-        android:label="Theta Music"
+        android:label="Theta Music Hatch"
         android:usesCleartextTraffic="true"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
@@ -64,6 +66,9 @@
 
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
     <queries>
+        <!-- 更新・設定のハブ（Theta.Hatch.Series spec §6.1、THETA_SHARED_SETTINGS.md §4.0） -->
+        <package android:name="app.thetahatch.home"/>
+        <package android:name="app.thetahatch.kidshome"/>
         <intent>
             <action android:name="android.speech.action.RECOGNIZE_SPEECH"/>
         </intent>

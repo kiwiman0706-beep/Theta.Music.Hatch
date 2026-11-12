@@ -6,7 +6,9 @@ import 'core/obsidian.dart';
 import 'core/player.dart';
 import 'core/scanner.dart';
 import 'core/settings.dart';
+import 'core/series.dart';
 import 'core/shelf.dart';
+import 'ui/hud/skins.g.dart';
 
 /// アプリ全体のサービス（シングルトン）
 class Services {
@@ -23,6 +25,16 @@ class Services {
 
   Services._(this.settings, this.library, this.ds, this.scanner, this.art, this.player, this.obsidian, this.favorites,
       this.recents, this.shelf);
+
+  /// ハブ（Theta Home Hatch）のスキン（ui.skin）に合わせる。起動時とアプリに戻ったとき
+  Future<void> syncFromHub() async {
+    if (!settings.followSeriesSkin) return;
+    final skin = (await Series.info())['ui.skin'];
+    if (skin != null && skinNames.contains(skin) && skin != settings.hudTheme) {
+      settings.hudTheme = skin;
+      await settings.save();
+    }
+  }
 
   static Future<Services> create() async {
     final settings = AppSettings();

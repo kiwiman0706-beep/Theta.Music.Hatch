@@ -12,6 +12,7 @@ import 'package:theta_music/core/scanner.dart';
 import 'package:theta_music/core/settings.dart';
 
 void main() {
+  AppSettings.secure = null; // テストでは暗号化した保存先を使わない
   final url = Platform.environment['DS_URL'];
   test('Audio Station: login, song list, stream, cover, obsidian via File Station', () async {
     SharedPreferences.setMockInitialValues({
