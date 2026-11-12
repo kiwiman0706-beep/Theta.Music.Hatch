@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 
 import 'favorites.dart';
@@ -10,9 +13,88 @@ import 'settings.dart';
 const _begin = '<!-- theta-music:begin (この区間は自動生成。外側に書いたメモは保持されます) -->';
 const _end = '<!-- theta-music:end -->';
 const _managedKeys = {
-  'type', 'artist', 'album', 'year', 'genre', 'tracks', 'nas_path', 'tags', 'albums', 'songs', 'updated', 'favorite',
-  'favorite_songs'
+  'theta', 'id', 'type', 'artist', 'album', 'year', 'genre', 'tracks', 'nas_path', 'tags', 'albums', 'songs',
+  'updated', 'favorite', 'favorite_songs'
 };
+
+/// 既定の書き出し先：NAS の共有フォルダ Obsidian の Theta Vault の中の Music
+/// （Theta.Hatch.Series spec/THETA_VAULT_SPEC.md「NAS の置き場所」）
+const defaultVaultMusic = '/Obsidian/Theta Vault/Music';
+
+/// Vault の中で同じものを見分ける id。アルバム・アーティストの名前から決まるので、
+/// どの端末で書き出しても、ライブラリを作り直しても同じになる（UUID の形）
+String stableId(String kind, String key) {
+  final h = md5.convert(utf8.encode('music/$kind:$key')).toString();
+  return '${h.substring(0, 8)}-${h.substring(8, 12)}-${h.substring(12, 16)}-${h.substring(16, 20)}-${h.substring(20)}';
+}
+
+/// 曲のフォルダ（/music/…）を Vault から参照する形（nas://music/…）に
+String nasPath(String folder) => 'nas:/${folder.startsWith('/') ? folder : '/$folder'}';
+
+/// Obsidian Bases（.base）の一覧。無いときだけ作る（利用者が直したらそちらが優先）
+String _albumsBase(String folder) => '''filters:
+  and:
+    - file.inFolder("$folder/Albums")
+properties:
+  note.album:
+    displayName: アルバム
+  note.artist:
+    displayName: アーティスト
+  note.year:
+    displayName: 年
+  note.genre:
+    displayName: ジャンル
+  note.tracks:
+    displayName: 曲数
+  note.favorite:
+    displayName: お気に入り
+views:
+  - type: table
+    name: アルバム
+    order:
+      - note.album
+      - note.artist
+      - note.year
+      - note.genre
+      - note.tracks
+      - note.favorite
+    sort:
+      - property: note.artist
+        direction: ASC
+      - property: note.year
+        direction: ASC
+  - type: table
+    name: お気に入り
+    filters:
+      and:
+        - note.favorite == true
+    order:
+      - note.album
+      - note.artist
+      - note.year
+''';
+
+String _artistsBase(String folder) => '''filters:
+  and:
+    - file.inFolder("$folder/Artists")
+properties:
+  file.name:
+    displayName: アーティスト
+  note.albums:
+    displayName: アルバム数
+  note.songs:
+    displayName: 曲数
+  note.favorite:
+    displayName: お気に入り
+views:
+  - type: table
+    name: アーティスト
+    order:
+      - file.name
+      - note.albums
+      - note.songs
+      - note.favorite
+''';
 
 String safeName(String s) {
   final r = s.replaceAll(RegExp(r'[\\/:*?"<>|#^\[\]]'), '_').trim();
@@ -21,8 +103,8 @@ String safeName(String s) {
 
 String _yamlStr(String s) => '"${s.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"';
 
-String _albumNote(Album a) => 'Albums/${safeName('${a.artist} - ${a.title}')}';
-String _artistNote(String name) => 'Artists/${safeName(name)}';
+String _albumFile(Album a) => 'Albums/${safeName('${a.artist} - ${a.title}')}';
+String _artistFile(String name) => 'Artists/${safeName(name)}';
 
 /// ライブラリを Obsidian Vault 向け Markdown として NAS（WebDAV）に書き出す。
 /// 既存ノートは自動生成区間とフロントマターの管理キーだけ更新し、手書きメモは残す。
@@ -40,12 +122,11 @@ class ObsidianExporter extends ChangeNotifier {
 
   Future<void> export() async {
     if (running) return;
-    final base = settings.obsidianPath.trim().replaceAll(RegExp(r'/+$'), '');
-    if (base.isEmpty) {
-      status = 'Settings で Obsidian フォルダを設定してください';
-      notifyListeners();
-      return;
-    }
+    final base = _base();
+    // Vault の中でのフォルダ名（リンクは Vault のルートから：[[Music/Albums/…]]）
+    final folder = base.substring(base.lastIndexOf('/') + 1);
+    String albumNote(Album a) => '$folder/${_albumFile(a)}';
+    String artistNote(String name) => '$folder/${_artistFile(name)}';
     running = true;
     done = 0;
     status = '書き出し中…';
@@ -54,13 +135,15 @@ class ObsidianExporter extends ChangeNotifier {
 
     for (final a in library.albums) {
       final fm = <String, String>{
+        'theta': 'music/album@1',
+        'id': stableId('album', a.key),
         'type': 'album',
-        'artist': _yamlStr('[[${_artistNote(a.artist)}|${a.artist}]]'),
+        'artist': _yamlStr('[[${artistNote(a.artist)}|${a.artist}]]'),
         'album': _yamlStr(a.title),
         if (a.year != 0) 'year': '${a.year}',
         if (a.genre.isNotEmpty) 'genre': _yamlStr(a.genre),
         'tracks': '${a.tracks.length}',
-        'nas_path': _yamlStr(a.tracks.first.folder),
+        'nas_path': _yamlStr(nasPath(a.tracks.first.folder)),
         'tags': (favorites?.isAlbum(a) ?? false) ? '[music/album, music/favorite]' : '[music/album]',
         if (favorites?.isAlbum(a) ?? false) 'favorite': 'true',
         if (a.tracks.any((t) => favorites?.isTrack(t) ?? false))
@@ -70,7 +153,7 @@ class ObsidianExporter extends ChangeNotifier {
       final b = StringBuffer()
         ..writeln('# ${a.title}')
         ..writeln()
-        ..writeln('**Artist:** [[${_artistNote(a.artist)}|${a.artist}]]${a.year != 0 ? '  ·  **Year:** ${a.year}' : ''}')
+        ..writeln('**Artist:** [[${artistNote(a.artist)}|${a.artist}]]${a.year != 0 ? '  ·  **Year:** ${a.year}' : ''}')
         ..writeln()
         ..writeln('| # | Title | Artist |')
         ..writeln('|---|---|---|');
@@ -79,11 +162,13 @@ class ObsidianExporter extends ChangeNotifier {
         final star = (favorites?.isTrack(t) ?? false) ? '★ ' : '';
         b.writeln('| $no | $star${t.title.replaceAll('|', '\\|')} | ${t.displayArtist.replaceAll('|', '\\|')} |');
       }
-      notes['${_albumNote(a)}.md'] = (fm, b.toString());
+      notes['${_albumFile(a)}.md'] = (fm, b.toString());
     }
 
     for (final ar in library.artists) {
       final fm = <String, String>{
+        'theta': 'music/artist@1',
+        'id': stableId('artist', ar.key),
         'type': 'artist',
         'albums': '${ar.albums.length}',
         'songs': '${ar.tracks.length}',
@@ -96,9 +181,9 @@ class ObsidianExporter extends ChangeNotifier {
         ..writeln()
         ..writeln('## Albums');
       for (final a in ar.albums) {
-        b.writeln('- [[${_albumNote(a)}|${a.title}]]${a.year != 0 ? ' (${a.year})' : ''}');
+        b.writeln('- [[${albumNote(a)}|${a.title}]]${a.year != 0 ? ' (${a.year})' : ''}');
       }
-      notes['${_artistNote(ar.name)}.md'] = (fm, b.toString());
+      notes['${_artistFile(ar.name)}.md'] = (fm, b.toString());
     }
 
     final idx = StringBuffer()
@@ -109,16 +194,17 @@ class ObsidianExporter extends ChangeNotifier {
       ..writeln('- Artists: ${library.artists.length}')
       ..writeln('- Scanned: ${library.scannedAt?.toIso8601String() ?? '-'}')
       ..writeln()
-      ..writeln('## Albums (Dataview)')
-      ..writeln('```dataview')
-      ..writeln('TABLE artist, year, genre, tracks FROM #music/album SORT artist, year')
-      ..writeln('```')
+      ..writeln('## 一覧（Obsidian Bases）')
+      ..writeln()
+      ..writeln('![[$folder/アルバム.base]]')
+      ..writeln()
+      ..writeln('- [[$folder/アーティスト.base|アーティスト]]')
       ..writeln()
       ..writeln('## Artists');
     for (final ar in library.artists) {
-      idx.writeln('- [[${_artistNote(ar.name)}|${ar.name}]]');
+      idx.writeln('- [[${artistNote(ar.name)}|${ar.name}]]');
     }
-    notes['Music Library.md'] = ({'type': 'index', 'updated': now}, idx.toString());
+    notes['Music Library.md'] = ({'theta': 'music/index@1', 'type': 'index', 'updated': now}, idx.toString());
 
     total = notes.length;
     notifyListeners();
@@ -127,6 +213,11 @@ class ObsidianExporter extends ChangeNotifier {
     try {
       await dav.mkdirs('$base/Albums');
       await dav.mkdirs('$base/Artists');
+      // 一覧（.base）は無いときだけ作る
+      for (final (name, text) in [('アルバム.base', _albumsBase(folder)), ('アーティスト.base', _artistsBase(folder))]) {
+        if (await dav.getText('$base/$name') == null) await dav.putText('$base/$name', text);
+      }
+      await _registerInVault(dav, base);
       await pool<MapEntry<String, (Map<String, String>, String)>>(notes.entries, 4, (e) async {
         final path = '$base/${e.key}';
         try {
@@ -147,6 +238,97 @@ class ObsidianExporter extends ChangeNotifier {
       running = false;
       notifyListeners();
     }
+  }
+
+  String _base() {
+    final p = settings.obsidianPath.trim().replaceAll(RegExp(r'/+$'), '');
+    return p.isEmpty ? defaultVaultMusic : p;
+  }
+
+  /// Vault のルートの .theta/vault.json の apps に music を足す（無ければ作る）
+  Future<void> _registerInVault(NoteStore dav, String base) async {
+    final root = base.substring(0, base.lastIndexOf('/'));
+    if (root.isEmpty) return;
+    try {
+      final path = '$root/.theta/vault.json';
+      final text = await dav.getText(path);
+      Map<String, dynamic> j = {'spec': 1, 'apps': <String>[]};
+      if (text != null) j = (jsonDecode(text) as Map).cast<String, dynamic>();
+      final apps = [...((j['apps'] as List?) ?? const []).map((e) => '$e')];
+      if (apps.contains('music') && text != null) return;
+      if (!apps.contains('music')) apps.add('music');
+      j['apps'] = apps;
+      j['spec'] ??= 1;
+      await dav.mkdirs('$root/.theta');
+      await dav.putText(path, const JsonEncoder.withIndent('  ').convert(j));
+    } catch (e) {
+      debugPrint('vault.json: $e'); // 読めない形なら触らない
+    }
+  }
+
+  /// Vault のノートからお気に入りを戻す（新しい端末・入れ直したとき）。
+  /// favorite: true のアルバム・アーティストと、曲の表で ★ の付いた曲。戻した数を返す
+  Future<int> restoreFavorites() async {
+    final fav = favorites;
+    if (fav == null || running) return 0;
+    running = true;
+    done = 0;
+    total = library.albums.length + library.artists.length;
+    status = 'Vault からお気に入りを読み込み中…';
+    notifyListeners();
+    final base = _base();
+    final dav = store();
+    var restored = 0;
+    bool favoriteIn(String text) => RegExp(r'^favorite:\s*true\s*$', multiLine: true).hasMatch(_frontmatter(text));
+    try {
+      await pool<Album>(library.albums, 4, (a) async {
+        try {
+          final text = await dav.getText('$base/${_albumFile(a)}.md');
+          if (text != null) {
+            if (favoriteIn(text) && !fav.isAlbum(a)) {
+              fav.toggleAlbum(a);
+              restored++;
+            }
+            for (final m in RegExp(r'^\|[^|]*\|\s*★ (.+?)\s*\|', multiLine: true).allMatches(text)) {
+              final title = m.group(1)!.replaceAll(r'\|', '|');
+              for (final t in a.tracks) {
+                if (t.title == title && !fav.isTrack(t)) {
+                  fav.toggleTrack(t);
+                  restored++;
+                }
+              }
+            }
+          }
+        } catch (_) {}
+        done++;
+        if (done % 10 == 0) notifyListeners();
+      }, () => false);
+      await pool<Artist>(library.artists, 4, (ar) async {
+        try {
+          final text = await dav.getText('$base/${_artistFile(ar.name)}.md');
+          if (text != null && favoriteIn(text) && !fav.isArtist(ar)) {
+            fav.toggleArtist(ar);
+            restored++;
+          }
+        } catch (_) {}
+        done++;
+        if (done % 10 == 0) notifyListeners();
+      }, () => false);
+      status = '完了: お気に入りを $restored 件戻しました';
+    } catch (e) {
+      status = 'エラー: $e';
+    } finally {
+      dav.close();
+      running = false;
+      notifyListeners();
+    }
+    return restored;
+  }
+
+  static String _frontmatter(String text) {
+    if (!text.startsWith('---\n')) return '';
+    final close = text.indexOf('\n---', 4);
+    return close < 0 ? '' : text.substring(4, close);
   }
 
   /// 既存ノートと生成内容をマージ

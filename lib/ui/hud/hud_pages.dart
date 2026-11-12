@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app.dart';
 import '../../core/clicker.dart';
 import '../../core/models.dart';
+import '../../core/obsidian.dart' show defaultVaultMusic;
 import '../../core/search.dart';
 import '../../core/series.dart';
 import '../../core/settings.dart';
@@ -1009,7 +1010,7 @@ class LibraryPage extends StatelessWidget {
               code: 'OBSIDIAN',
               title: 'Vault へ書き出し',
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                ReadoutBox('VAULT', s.obsidianPath.isEmpty ? '未設定' : s.obsidianPath, accent: s.obsidianPath.isNotEmpty),
+                ReadoutBox('VAULT', s.obsidianPath.isEmpty ? defaultVaultMusic : s.obsidianPath, accent: true),
                 const SizedBox(height: 8),
                 if (ob.running || ob.status.isNotEmpty) ...[
                   Text(ob.running ? 'NOTE ${ob.done}/${ob.total}' : ob.status,
@@ -1018,7 +1019,8 @@ class LibraryPage extends StatelessWidget {
                   if (ob.running) HudProgress(ob.total == 0 ? 0 : ob.done / ob.total),
                   const SizedBox(height: 8),
                 ],
-                const Note('Albums/・Artists/ にノートを作ります。ノートに書き足したメモは、書き出し直しても残ります。'),
+                const Note('Theta Vault の Music/ に、アルバム・アーティストのノートと一覧（.base）を作ります。'
+                    'ノートに書き足したメモは、書き出し直しても残ります。お気に入りは favorite: true で、別の端末・入れ直したときに戻せます。'),
                 const SizedBox(height: 6),
                 Wrap(spacing: 10, runSpacing: 10, children: [
                   PillButton(
@@ -1027,10 +1029,11 @@ class LibraryPage extends StatelessWidget {
                     primary: true,
                     onTap: ob.running || lib.tracks.isEmpty
                         ? null
-                        : () async {
-                            if (s.obsidianPath.trim().isEmpty) await showObsidianDialog(context);
-                            if (s.obsidianPath.trim().isNotEmpty) await ob.export();
-                          },
+                        : ob.export,
+                  ),
+                  PillButton(
+                    text: 'RESTORE お気に入りを戻す',
+                    onTap: ob.running || lib.tracks.isEmpty ? null : ob.restoreFavorites,
                   ),
                   PillButton(text: 'FOLDER 書き出し先', onTap: () => showObsidianDialog(context)),
                 ]),

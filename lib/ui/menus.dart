@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../app.dart';
 import '../core/clicker.dart';
 import '../core/models.dart';
+import '../core/obsidian.dart' show defaultVaultMusic;
 import '../core/search.dart';
 import '../core/series.dart';
 import '../core/settings.dart';
@@ -289,7 +290,8 @@ InfoScreen exportScreen() => InfoScreen(
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('Obsidian へ書き出し', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
           const SizedBox(height: 8),
-          Text(services.settings.obsidianPath, style: const TextStyle(fontSize: 12, color: LcdColors.sub)),
+          Text(services.settings.obsidianPath.isEmpty ? defaultVaultMusic : services.settings.obsidianPath,
+              style: const TextStyle(fontSize: 12, color: LcdColors.sub)),
           const SizedBox(height: 8),
           if (o.total > 0) Text('${o.done} / ${o.total} ノート'),
           const SizedBox(height: 8),
@@ -314,12 +316,13 @@ MenuScreen libraryMenu() => MenuScreen(
       () => [
         MenuItem('Update Library', detail: _ago(services.library.scannedAt), onSelect: () => startScan(false)),
         MenuItem('Rebuild Library', onSelect: () => startScan(true)),
-        MenuItem('Export to Obsidian', onSelect: () async {
-          if (services.settings.obsidianPath.trim().isEmpty) {
-            await showObsidianDialog(nav.context);
-            if (services.settings.obsidianPath.trim().isEmpty) return;
-          }
+        MenuItem('Export to Obsidian', onSelect: () {
           services.obsidian.export();
+          nav.push(exportScreen());
+        }),
+        // 新しい端末・入れ直したとき：Vault のノートからお気に入りを戻す
+        MenuItem('Restore Favorites', onSelect: () {
+          services.obsidian.restoreFavorites();
           nav.push(exportScreen());
         }),
         MenuItem('Songs', detail: '${services.library.tracks.length}'),
@@ -387,7 +390,7 @@ MenuScreen settingsMenu() {
         s.readTags = !s.readTags;
         save();
       }),
-      MenuItem('Obsidian Folder', detail: s.obsidianPath.isEmpty ? '未設定' : null, chevron: true,
+      MenuItem('Obsidian Folder', detail: s.obsidianPath.isEmpty ? '既定' : null, chevron: true,
           onSelect: () => showObsidianDialog(nav.context)),
       MenuItem('Check for Updates', onSelect: () async {
         nav.toast('確認中…');

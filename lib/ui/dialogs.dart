@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app.dart';
 import '../core/dsaudio.dart';
+import '../core/obsidian.dart' show defaultVaultMusic;
 import '../core/series.dart';
 import '../core/settings.dart';
 import '../core/webdav.dart';
@@ -224,13 +225,13 @@ Future<void> showObsidianDialog(BuildContext context) {
         TextField(
           controller: path,
           decoration: const InputDecoration(
-            labelText: 'NAS 上のフォルダ',
-            hintText: '/home/Obsidian/MyVault/Music',
+            labelText: 'NAS 上のフォルダ（空なら既定）',
+            hintText: defaultVaultMusic,
           ),
         ),
         const SizedBox(height: 8),
         const Text(
-          'Vault 内のフォルダを指定してください（共有フォルダから書く。例 /home/Obsidian/MyVault/Music）。'
+          '既定はシリーズの Theta Vault（共有フォルダ Obsidian の Theta Vault/Music）。ほかの Vault にするときだけ、共有フォルダから書いてください。'
           'WebDAV のときは WebDAV で、DS audio のときは File Station で書き込みます。'
           'Albums/ と Artists/ にノートを作成します。'
           'ノートに追記したメモは再書き出し時も保持されます。',

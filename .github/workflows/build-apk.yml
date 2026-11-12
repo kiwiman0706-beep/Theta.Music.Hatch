@@ -1,8 +1,9 @@
+# 作業ブランチの確認用（デバッグ鍵、Artifacts に置くだけ）。main は release.yml
 name: Build APK
 
 on:
   push:
-    branches: ['**']
+    branches-ignore: [main]
   workflow_dispatch:
 
 jobs:
