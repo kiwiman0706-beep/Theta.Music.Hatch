@@ -16,8 +16,9 @@ Future<void> main() async {
     androidNotificationChannelName: 'Playback',
     androidNotificationOngoing: true,
   );
-  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   services = await Services.create();
+  await applyOrientation();
+  services.settings.addListener(applyOrientation);
   runApp(const ThetaMusicApp());
   // スキンはシリーズ（Theta Home Hatch の ui.skin）に合わせる
   services.syncFromHub();
@@ -37,6 +38,15 @@ Future<void> main() async {
       } catch (_) {}
     });
   });
+}
+
+/// 画面の向き：iPod はクリックホイールの形なので縦に固定、Theta は縦横どちらでも（タブレットの横向き）
+String? _orientationFor;
+Future<void> applyOrientation() async {
+  final skin = services.settings.skin;
+  if (skin == _orientationFor) return;
+  _orientationFor = skin;
+  await SystemChrome.setPreferredOrientations(skin == 'theta' ? const [] : const [DeviceOrientation.portraitUp]);
 }
 
 class ThetaMusicApp extends StatelessWidget {

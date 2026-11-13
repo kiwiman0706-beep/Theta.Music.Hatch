@@ -20,18 +20,19 @@ late HudNav hudNav;
 class _TabDef {
   final String label;
   final int group;
-  const _TabDef(this.label, this.group);
+  final IconData icon; // タブが低いとき（横向きのスマホ）は名前の代わりに印
+  const _TabDef(this.label, this.group, this.icon);
 }
 
 const _tabs = [
-  _TabDef('NOW', 0),
-  _TabDef('FAVS', 0),
-  _TabDef('ARTISTS', 1),
-  _TabDef('ALBUMS', 1),
-  _TabDef('SONGS', 1),
-  _TabDef('GENRES', 1),
-  _TabDef('FOLDERS', 1),
-  _TabDef('LIBRARY', 2),
+  _TabDef('NOW', 0, Icons.play_circle_outline),
+  _TabDef('FAVS', 0, Icons.star_border),
+  _TabDef('ARTISTS', 1, Icons.person_outline),
+  _TabDef('ALBUMS', 1, Icons.album_outlined),
+  _TabDef('SONGS', 1, Icons.music_note_outlined),
+  _TabDef('GENRES', 1, Icons.category_outlined),
+  _TabDef('FOLDERS', 1, Icons.folder_outlined),
+  _TabDef('LIBRARY', 2, Icons.library_music_outlined),
 ];
 const nowTab = 0, favTab = 1, libraryTab = 7, setupTab = 8;
 
@@ -221,13 +222,18 @@ class _RailTab extends StatelessWidget {
               alignment: Alignment.centerLeft,
               child: Container(width: 3, height: 20, color: active ? onActive : groupColor),
             ),
-            Column(children: [
-              const SizedBox(height: 7),
-              Text((index + 1).toString().padLeft(2, '0'),
-                  style: TextStyle(fontSize: 10, color: active ? onActive : p.faint, fontFamily: p.mono)),
+            // 横向きのスマホなどでタブが低いときは、番号を出さずに名前だけ
+            LayoutBuilder(builder: (context, c) => Column(children: [
+              if (c.maxHeight >= 72) ...[
+                const SizedBox(height: 7),
+                Text((index + 1).toString().padLeft(2, '0'),
+                    style: TextStyle(fontSize: 10, color: active ? onActive : p.faint, fontFamily: p.mono)),
+              ],
               Expanded(
                 child: Center(
-                  child: FittedBox(
+                  child: c.maxHeight < 64
+                      ? Icon(def.icon, size: 20, color: active ? onActive : p.fg)
+                      : FittedBox(
                     fit: BoxFit.scaleDown,
                     child: RotatedBox(
                       quarterTurns: 1,
@@ -241,7 +247,7 @@ class _RailTab extends StatelessWidget {
                   ),
                 ),
               ),
-            ]),
+            ])),
           ]),
         ),
       ),

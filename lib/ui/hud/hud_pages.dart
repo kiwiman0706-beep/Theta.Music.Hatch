@@ -79,8 +79,10 @@ class _RootHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = HudScope.of(context);
+    // 横向きのスマホなど低い画面では、大きな数字を小さくして中身を広く
+    final low = MediaQuery.sizeOf(context).height < 520;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 12, 10, 0),
+      padding: EdgeInsets.fromLTRB(14, low ? 6 : 12, 10, 0),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         SectionLabel(code),
         const SizedBox(height: 2),
@@ -92,7 +94,7 @@ class _RootHeader extends StatelessWidget {
               child: Text(big,
                   style: TextStyle(
                       color: p.fg,
-                      fontSize: 58,
+                      fontSize: low ? 34 : 58,
                       height: 1.15,
                       fontWeight: p.pop ? FontWeight.bold : FontWeight.w300,
                       fontFamily: p.display)),
@@ -105,9 +107,9 @@ class _RootHeader extends StatelessWidget {
             Text(ja, style: TextStyle(color: p.accent, fontSize: 15, letterSpacing: 1, fontFamily: p.mono)),
           ]),
         ]),
-        const SizedBox(height: 6),
+        SizedBox(height: low ? 2 : 6),
         const Ticks(),
-        const SizedBox(height: 10),
+        SizedBox(height: low ? 6 : 10),
       ]),
     );
   }
@@ -308,24 +310,7 @@ class NowPage extends StatelessWidget {
     final pl = services.player;
     final t = pl.current;
     final s = services.settings;
-    return ListView(padding: EdgeInsets.zero, children: [
-      StreamBuilder<Duration>(
-        stream: pl.audio.positionStream,
-        builder: (context, snap) => _RootHeader(
-          code: 'NOW.PLAYING',
-          big: t == null ? '--:--' : _fmt(snap.data ?? Duration.zero),
-          en: t == null ? 'STANDBY' : 'TRACK ${(pl.index + 1).toString().padLeft(2, '0')}/${pl.queue.length.toString().padLeft(2, '0')}',
-          ja: t == null ? '待機中' : (pl.playing ? 'PLAY / 再生中' : 'PAUSE / 一時停止'),
-        ),
-      ),
-      // ライブラリ全体の検索。マイクで「〜をかけて」と言うとすぐ再生
-      _Search(
-        onChanged: (_) {},
-        onSubmitted: (q) {
-          if (q.trim().isNotEmpty) hudRunSearch(context, [q]);
-        },
-        onVoice: (alts) => hudRunSearch(context, alts),
-      ),
+    final track =
       Padding(
         padding: const EdgeInsets.fromLTRB(14, 0, 10, 10),
         child: t == null
@@ -349,7 +334,8 @@ class NowPage extends StatelessWidget {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                   Center(
                     child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 300),
+                      // 低い画面（横向き）でも、ジャケットが画面の高さに収まるように
+                      constraints: BoxConstraints(maxWidth: (MediaQuery.sizeOf(context).height * 0.55).clamp(140, 300)),
                       child: HudArt(t.art),
                     ),
                   ),
@@ -414,11 +400,46 @@ class NowPage extends StatelessWidget {
                   ],
                 ]),
               ),
+      );
+    final top = <Widget>[
+      StreamBuilder<Duration>(
+        stream: pl.audio.positionStream,
+        builder: (context, snap) => _RootHeader(
+          code: 'NOW.PLAYING',
+          big: t == null ? '--:--' : _fmt(snap.data ?? Duration.zero),
+          en: t == null ? 'STANDBY' : 'TRACK ${(pl.index + 1).toString().padLeft(2, '0')}/${pl.queue.length.toString().padLeft(2, '0')}',
+          ja: t == null ? '待機中' : (pl.playing ? 'PLAY / 再生中' : 'PAUSE / 一時停止'),
+        ),
       ),
-      const _StatusRow(),
-      if (t != null) const _QueuePanel(),
-      const SizedBox(height: 10),
-    ]);
+      // ライブラリ全体の検索。マイクで「〜をかけて」と言うとすぐ再生
+      _Search(
+        onChanged: (_) {},
+        onSubmitted: (q) {
+          if (q.trim().isNotEmpty) hudRunSearch(context, [q]);
+        },
+        onVoice: (alts) => hudRunSearch(context, alts),
+      ),
+    ];
+    // タブレットの横向きなど広いときは、左に再生中の曲、右に計器とキュー
+    return LayoutBuilder(builder: (context, c) {
+      if (c.maxWidth >= 720 && t != null) {
+        return ListView(padding: EdgeInsets.zero, children: [
+          ...top,
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(flex: 5, child: track),
+            const Expanded(flex: 6, child: Column(children: [_StatusRow(), _QueuePanel()])),
+          ]),
+          const SizedBox(height: 10),
+        ]);
+      }
+      return ListView(padding: EdgeInsets.zero, children: [
+        ...top,
+        track,
+        const _StatusRow(),
+        if (t != null) const _QueuePanel(),
+        const SizedBox(height: 10),
+      ]);
+    });
   }
 }
 
