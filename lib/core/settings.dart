@@ -25,6 +25,8 @@ class AppSettings extends ChangeNotifier {
   bool readTags = true;
   bool clicker = true; // iPod のカリカリ音
   bool haptics = true; // ホイールの振動
+  /// ジャケットに重ねるオーディオビジュアライザー：off / bars（スペクトラム） / wave（波形）
+  String visualizer = 'off';
   bool blackBody = false;
   bool shuffle = false;
   RepeatSetting repeat = RepeatSetting.off;
@@ -60,6 +62,7 @@ class AppSettings extends ChangeNotifier {
     readTags = _p.getBool('readTags') ?? true;
     clicker = _p.getBool('clicker') ?? true;
     haptics = _p.getBool('haptics') ?? true;
+    visualizer = _p.getString('visualizer') ?? 'off';
     dsFavRating = _p.getInt('dsFavRating') ?? 4;
     shelfFavorites = _p.getBool('shelfFavorites') ?? true;
     shelfRecent = _p.getBool('shelfRecent') ?? true;
@@ -109,6 +112,7 @@ class AppSettings extends ChangeNotifier {
     await _p.setBool('readTags', readTags);
     await _p.setBool('clicker', clicker);
     await _p.setBool('haptics', haptics);
+    await _p.setString('visualizer', visualizer);
     await _p.setInt('dsFavRating', dsFavRating);
     await _p.setBool('shelfFavorites', shelfFavorites);
     await _p.setBool('shelfRecent', shelfRecent);

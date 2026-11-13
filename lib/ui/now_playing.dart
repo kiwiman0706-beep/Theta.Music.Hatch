@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../app.dart';
 import 'ipod_theme.dart';
 import 'screens.dart';
+import 'visualizer_view.dart';
 
 enum _Mode { progress, volume, scrub }
 
@@ -94,7 +95,14 @@ class NowPlayingScreen extends IPodScreen {
           const SizedBox(height: 6),
           Expanded(
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              _ReflectedArt(size: artSize, child: ArtImage(t.art, key: ValueKey(t.art?.key))),
+              _ReflectedArt(
+                size: artSize,
+                child: Stack(fit: StackFit.expand, children: [
+                  ArtImage(t.art, key: ValueKey(t.art?.key)),
+                  // ジャケットに重ねるビジュアライザー（設定 → Visualizer）
+                  const VisualizerView(color: Color(0xFF6AAEF4), peak: Colors.white),
+                ]),
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Padding(

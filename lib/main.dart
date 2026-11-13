@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:just_audio_background/just_audio_background.dart';
+import 'package:audio_service/audio_service.dart';
 
 import 'app.dart';
+import 'core/media_handler.dart';
 import 'core/shelf.dart';
 import 'ui/hud/hud_theme.dart';
 import 'ui/screens.dart' show nav;
@@ -10,12 +11,20 @@ import 'ui/shell.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await JustAudioBackground.init(
-    androidNotificationChannelId: 'app.thetahatch.music.playback',
-    androidNotificationChannelName: 'Playback',
-    androidNotificationOngoing: true,
-  );
   services = await Services.create();
+  // Android の「再生中」（通知・ロック画面・Bluetooth・Android Auto）
+  await AudioService.init(
+    builder: () => MediaHandler(services.player, services.library, services.favorites, services.recents, services.art,
+        services.settings),
+    config: const AudioServiceConfig(
+      androidNotificationChannelId: 'app.thetahatch.music.playback',
+      androidNotificationChannelName: '再生中',
+      androidNotificationOngoing: true,
+      androidStopForegroundOnPause: true,
+      artDownscaleWidth: 512,
+      artDownscaleHeight: 512,
+    ),
+  );
   await applyOrientation();
   services.settings.addListener(applyOrientation);
   runApp(const ThetaMusicApp());

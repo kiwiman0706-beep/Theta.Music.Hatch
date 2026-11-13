@@ -2,6 +2,7 @@ package app.thetahatch.music
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.media.AudioAttributes
 import android.media.SoundPool
 import android.net.Uri
@@ -17,6 +18,7 @@ import kotlin.math.sin
 import kotlin.random.Random
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 
 /**
@@ -30,6 +32,15 @@ class MainActivity : AudioServiceActivity() {
     private var pool: SoundPool? = null
     private var clickId = 0
     private var clickReady = false
+    private var permissionResult: MethodChannel.Result? = null
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQ_RECORD) {
+            permissionResult?.success(grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED)
+            permissionResult = null
+        }
+    }
     private var shelf: MethodChannel? = null
     /** Theta Home の棚から押されて起動したとき、Dart が読むまで預かる */
     private var initialPlay: Map<String, String>? = null
@@ -52,6 +63,28 @@ class MainActivity : AudioServiceActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "theta_music/series").setMethodCallHandler(Series.handler(this))
+        // ビジュアライザー（Vis.kt）。許可を求める・始める・止める
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, "theta_music/visualizer/data").setStreamHandler(Vis)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "theta_music/visualizer").setMethodCallHandler { call, result ->
+            when (call.method) {
+                "granted" -> result.success(checkSelfPermission(RECORD) == PackageManager.PERMISSION_GRANTED)
+                "request" -> {
+                    if (checkSelfPermission(RECORD) == PackageManager.PERMISSION_GRANTED) {
+                        result.success(true)
+                    } else {
+                        permissionResult?.success(false)
+                        permissionResult = result
+                        requestPermissions(arrayOf(RECORD), REQ_RECORD)
+                    }
+                }
+                "start" -> result.success(Vis.start(call.argument<Int>("session") ?: 0))
+                "stop" -> {
+                    Vis.stop()
+                    result.success(null)
+                }
+                else -> result.notImplemented()
+            }
+        }
         shelf = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "theta_music/shelf").apply {
             setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -146,6 +179,7 @@ class MainActivity : AudioServiceActivity() {
     }
 
     override fun onDestroy() {
+        Vis.stop()
         pool?.release()
         pool = null
         super.onDestroy()
@@ -153,6 +187,8 @@ class MainActivity : AudioServiceActivity() {
 
     companion object {
         private const val REQ_VOICE = 4101
+        private const val REQ_RECORD = 4102
+        private const val RECORD = android.Manifest.permission.RECORD_AUDIO
         /** Theta Home の棚から「再生」（extra: kind = album / artist / favsongs、key） */
         const val ACTION_PLAY = "app.thetahatch.music.PLAY"
         private const val RATE = 44100

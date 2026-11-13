@@ -7,6 +7,7 @@ import '../core/obsidian.dart' show defaultVaultMusic;
 import '../core/search.dart';
 import '../core/series.dart';
 import '../core/settings.dart';
+import '../core/visualizer.dart';
 import 'hud/skins.g.dart';
 import '../core/voice.dart';
 import 'dialogs.dart';
@@ -372,6 +373,17 @@ MenuScreen settingsMenu() {
         // オンにしたら試しに鳴らす
         if (s.clicker && !await Clicker.test()) nav.toast('クリック音を鳴らせませんでした');
         if (s.clicker) nav.toast('クリック音はメディアの音量で鳴ります');
+      }),
+      MenuItem('Visualizer',
+          detail: switch (s.visualizer) { 'bars' => 'Bars', 'wave' => 'Wave', _ => 'Off' }, onSelect: () async {
+        // Off → Bars（スペクトラム）→ Wave（波形）→ Off。オンにするときは録音の許可（録音はしない）
+        final next = switch (s.visualizer) { 'off' => 'bars', 'bars' => 'wave', _ => 'off' };
+        if (s.visualizer == 'off' && !await VisualizerFeed.requestPermission()) {
+          nav.toast('ビジュアライザーには「マイク」の許可が要ります（録音はしません）');
+          return;
+        }
+        s.visualizer = next;
+        save();
       }),
       MenuItem('Haptics', detail: s.haptics ? 'On' : 'Off', onSelect: () {
         s.haptics = !s.haptics;

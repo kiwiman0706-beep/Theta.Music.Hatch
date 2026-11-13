@@ -4,6 +4,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- ビジュアライザー（Android の Visualizer は録音の許可が要る。録音はしない。オンにしたときだけ求める） -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
     <!-- シリーズのハブ（Home・KidsHome）の設定を読む（共通鍵のアプリ同士）。権限の定義は src/series/ -->
     <uses-permission android:name="app.thetahatch.permission.SHARE"/>
     <application
@@ -46,6 +49,15 @@
                 <action android:name="android.intent.action.MEDIA_BUTTON"/>
             </intent-filter>
         </receiver>
+        <!-- ジャケット（通知・ロック画面・Android Auto が読む。cache/art の画像だけ、読み取りのみ） -->
+        <provider
+            android:name=".ArtProvider"
+            android:authorities="${applicationId}.art"
+            android:exported="true" />
+        <!-- Android Auto に音楽アプリとして出す -->
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
         <!-- Theta Home の棚（Theta.Hatch.Series spec/THETA_SHARED_SETTINGS.md §4.2）。
              権限 app.thetahatch.permission.SHARE の定義は、共通鍵で署名するときだけ src/series/ から足す -->
         <provider

@@ -53,6 +53,12 @@ Tailscale 経由で NAS の音楽を再生する Android 音楽プレーヤー�
 | お気に入りを見る | Favorites | 左のタブの FAVS |
 | 音声検索 | MENU 長押し、または Search → Voice Search | MENU 長押し、または左のタブの SEARCH |
 
+## Android の再生中・Android Auto・ビジュアライザー
+
+- 通知・ロック画面・Bluetooth から操作できる（audio_service）。ジャケットは `content://app.thetahatch.music.art/…`（キャッシュの画像だけを読み取りで出す）
+- Android Auto：お気に入り・最近再生・アーティスト・アルバム・全曲シャッフル、音声の「〇〇を再生」（アプリの検索）。Play ストア以外から入れたアプリは、Android Auto のデベロッパー設定で「提供元不明のアプリ」を許可すると出る
+- ビジュアライザー：設定 → Visualizer（Bars／Wave）。ジャケットに重ねる。Android の Visualizer を使うので「マイク」の許可が要る（録音はしない）
+
 ## 見た目（スキン）
 
 | スキン | 内容 |

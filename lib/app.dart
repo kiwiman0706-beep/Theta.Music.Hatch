@@ -8,6 +8,7 @@ import 'core/scanner.dart';
 import 'core/settings.dart';
 import 'core/series.dart';
 import 'core/shelf.dart';
+import 'core/visualizer.dart';
 import 'ui/hud/skins.g.dart';
 
 /// アプリ全体のサービス（シングルトン）
@@ -22,9 +23,10 @@ class Services {
   final Favorites favorites;
   final Recents recents;
   final ShelfWriter shelf;
+  final VisualizerFeed visualizer;
 
   Services._(this.settings, this.library, this.ds, this.scanner, this.art, this.player, this.obsidian, this.favorites,
-      this.recents, this.shelf);
+      this.recents, this.shelf, this.visualizer);
 
   /// ハブ（Theta Home Hatch）のスキン（ui.skin）に合わせる。起動時とアプリに戻ったとき
   Future<void> syncFromHub() async {
@@ -68,6 +70,7 @@ class Services {
       favorites,
       recents,
       shelf,
+      VisualizerFeed(settings, player),
     );
   }
 }
