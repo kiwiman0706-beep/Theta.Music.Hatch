@@ -25,6 +25,8 @@ late Nav nav;
 abstract class IPodScreen extends ChangeNotifier {
   String get title;
   final Key key = UniqueKey();
+  /// ホイールがこの画面を操作しているか（Theta で再生中のパネルにフォーカスがあるときは false）
+  bool active = true;
   void onScroll(int delta) {}
   void onSelect() {}
   /// 中央ボタンの長押し（お気に入りの登録など）
@@ -42,8 +44,17 @@ class MenuItem {
   final VoidCallback? onLong; // 中央ボタン長押し・行の長押し
   final bool starred;
   final String? trackPath; // 曲の行：再生中なら印を出す
+  final ArtRef? art; // サムネイル
+  final bool thumb; // サムネイルの枠を出す（アルバム・アーティスト・曲）
   const MenuItem(this.label,
-      {this.detail, this.chevron = false, this.onSelect, this.onLong, this.starred = false, this.trackPath});
+      {this.detail,
+      this.chevron = false,
+      this.onSelect,
+      this.onLong,
+      this.starred = false,
+      this.trackPath,
+      this.art,
+      this.thumb = false});
 }
 
 /// リスト形式のメニュー画面
@@ -152,7 +163,7 @@ class MenuScreen extends IPodScreen {
     final list = LayoutBuilder(builder: (context, c) {
       _viewport = c.maxHeight;
       if (hud != null) {
-        _rowH = 46;
+        _rowH = items.any((it) => it.thumb) ? 56 : 46;
       } else {
         final rows = (c.maxHeight / 34).floor().clamp(5, 12);
         _rowH = c.maxHeight / rows;
@@ -200,7 +211,8 @@ class MenuScreen extends IPodScreen {
 
   /// Theta スキンの行：縞模様、選んでいる行はアクセント色、再生中の曲に印
   Widget _hudRow(Palette p, MenuItem it, bool sel, int i, String? playing) {
-    final fg = sel ? p.onAccent : p.fg;
+    final lit = sel && active; // フォーカスが無いときは、選んでいる行を枠だけにする
+    final fg = lit ? p.onAccent : p.fg;
     final now = it.trackPath != null && it.trackPath == playing;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -209,27 +221,33 @@ class MenuScreen extends IPodScreen {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: sel ? p.accent : (i.isOdd ? p.zebra : null),
+          color: lit ? p.accent : (i.isOdd ? p.zebra : null),
+          border: sel && !active ? Border.all(color: p.accent.withValues(alpha: 0.6)) : null,
           borderRadius: p.rounded && sel ? BorderRadius.circular(6) : null,
         ),
         child: Row(children: [
+          if (it.thumb)
+            Padding(
+              padding: const EdgeInsets.only(right: 10),
+              child: HudArt(it.art, key: ValueKey(it.art?.key), size: _rowH - 14),
+            ),
           if (now)
-            Padding(padding: const EdgeInsets.only(right: 8), child: Icon(Icons.graphic_eq, size: 18, color: sel ? fg : p.accent)),
+            Padding(padding: const EdgeInsets.only(right: 8), child: Icon(Icons.graphic_eq, size: 18, color: lit ? fg : p.accent)),
           if (it.starred)
-            Padding(padding: const EdgeInsets.only(right: 6), child: Icon(Icons.star, size: 16, color: sel ? fg : p.accent)),
+            Padding(padding: const EdgeInsets.only(right: 6), child: Icon(Icons.star, size: 16, color: lit ? fg : p.accent)),
           Expanded(
             child: Text(it.label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: now && !sel ? p.accent : fg, fontSize: 15)),
+                style: TextStyle(color: now && !lit ? p.accent : fg, fontSize: 15)),
           ),
           if (it.detail != null)
             Padding(
               padding: const EdgeInsets.only(left: 8),
               child: Text(it.detail!,
-                  style: TextStyle(color: sel ? fg : p.faint, fontSize: 12, fontFamily: p.mono, letterSpacing: 0.5)),
+                  style: TextStyle(color: lit ? fg : p.faint, fontSize: 12, fontFamily: p.mono, letterSpacing: 0.5)),
             ),
-          if (it.chevron) Icon(Icons.chevron_right, color: sel ? fg : p.faint, size: 20),
+          if (it.chevron) Icon(Icons.chevron_right, color: lit ? fg : p.faint, size: 20),
         ]),
       ),
     );
@@ -255,6 +273,19 @@ class MenuScreen extends IPodScreen {
         padding: const EdgeInsets.symmetric(horizontal: 8),
         decoration: sel ? const BoxDecoration(gradient: LcdColors.selection) : null,
         child: Row(children: [
+          // iPod classic と同じく、アルバム・アーティストの一覧にジャケット（曲の一覧には付けない）
+          if (it.thumb && it.trackPath == null)
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: SizedBox(
+                width: _rowH - 4,
+                height: _rowH - 4,
+                child: ArtImage(it.art,
+                    key: ValueKey(it.art?.key),
+                    placeholder: const ColoredBox(
+                        color: Color(0xFFDDE1E6), child: Icon(Icons.music_note, size: 14, color: Colors.white))),
+              ),
+            ),
           if (it.starred)
             Padding(
               padding: const EdgeInsets.only(right: 4),

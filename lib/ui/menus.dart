@@ -50,6 +50,8 @@ void _favToast(bool on) => nav.toast(on ? '★ お気に入りに追加' : 'お�
 MenuItem _trackItem(List<Track> list, int i) => MenuItem(
       list[i].title,
       trackPath: list[i].path,
+      art: list[i].art,
+      thumb: true,
       starred: services.favorites.isTrack(list[i]),
       onSelect: () => _play(list, i),
       onLong: () => _favToast(services.favorites.toggleTrack(list[i])),
@@ -58,6 +60,8 @@ MenuItem _trackItem(List<Track> list, int i) => MenuItem(
 MenuItem _albumItem(Album al, {String? label}) => MenuItem(
       label ?? al.title,
       chevron: true,
+      art: al.art,
+      thumb: true,
       starred: services.favorites.isAlbum(al),
       onSelect: () => nav.push(albumMenu(al)),
       onLong: () => _favToast(services.favorites.toggleAlbum(al)),
@@ -66,6 +70,8 @@ MenuItem _albumItem(Album al, {String? label}) => MenuItem(
 MenuItem _artistItem(Artist a) => MenuItem(
       a.name,
       chevron: true,
+      art: a.albums.map((al) => al.art).firstWhere((r) => r != null, orElse: () => null),
+      thumb: true,
       starred: services.favorites.isArtist(a),
       onSelect: () => nav.push(artistMenu(a)),
       onLong: () => _favToast(services.favorites.toggleArtist(a)),
@@ -471,8 +477,13 @@ MenuScreen queueMenu() {
         MenuItem(p.queue[i].title,
             detail: p.queue[i].displayArtist,
             trackPath: p.queue[i].path,
+            art: p.queue[i].art,
+            thumb: true,
             starred: services.favorites.isTrack(p.queue[i]),
-            onSelect: () => p.jumpTo(i),
+            onSelect: () {
+              p.jumpTo(i);
+              nav.showNowPlaying();
+            },
             onLong: () => _favToast(services.favorites.toggleTrack(p.queue[i]))),
     ],
     deps: [p, services.favorites],

@@ -104,13 +104,22 @@ class Player extends ChangeNotifier {
     lastError = null;
     _retries = 0;
     notifyListeners();
+    // 新しい曲順を準備している間に、前の曲順が次の曲へ進まないように止めておく
+    if (audio.playing) unawaited(audio.pause());
     await _load(startIndex, Duration.zero, play: true);
   }
 
+  /// 曲順を入れ替えた回数。準備に時間がかかっている間に別の曲が選ばれたら、古い方は入れない
+  /// （前は、先に選んだ曲順があとから入って、選んでいない曲が流れることがあった）
+  int _gen = 0;
+
   Future<void> _load(int i, Duration pos, {required bool play}) async {
+    final gen = ++_gen;
     try {
       final sources = await Future.wait(queue.map(_source));
+      if (gen != _gen) return;
       await audio.setAudioSources(sources, initialIndex: i, initialPosition: pos);
+      if (gen != _gen) return;
       if (play) unawaited(audio.play());
     } catch (e) {
       _onError(e);

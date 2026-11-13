@@ -76,4 +76,19 @@ void main() {
     expect(g.toggleTrack(l.songs.first), isFalse);
     expect(g.tracks, isEmpty);
   });
+
+  test('artist songs: only tracks by the artist (album-artist albums may hold other singers)', () async {
+    final l = Library()..dirOverride = await Directory.systemTemp.createTemp('lib');
+    Track at(String artist, String albumArtist, String album, String title, int no) => Track(
+        path: '/music/$albumArtist/$album/$no.flac', size: 1, mtime: 0, title: title, artist: artist,
+        albumArtist: albumArtist, album: album, trackNo: no);
+    await l.replace([
+      at('山下達郎', '山下達郎', 'Produce Works', 'Ride on Time', 1),
+      at('槇原敬之', '山下達郎', 'Produce Works', '別の歌手の曲', 2),
+      at('山下達郎 & 竹内まりや', '山下達郎', 'Produce Works', 'デュエット', 3),
+    ], '/music');
+    final a = l.artists.single;
+    expect(a.albumTracks.length, 3);
+    expect([for (final t in a.tracks) t.title], ['Ride on Time', 'デュエット']);
+  });
 }

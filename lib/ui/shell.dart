@@ -96,8 +96,11 @@ class _IPodShellState extends State<IPodShell> implements Nav {
 
   @override
   void showNowPlaying() {
-    // Theta は再生中の曲がいつも見えているので、リストはそのまま（選んだ曲に印が付く）
-    if (widget.theta) return;
+    // Theta：iPod が Now Playing に移るのと同じく、ホイールのフォーカスを再生中のパネルへ（リストはそのまま）
+    if (widget.theta) {
+      _setFocusNow(true);
+      return;
+    }
     if (_top is NowPlayingScreen) return;
     push(NowPlayingScreen());
   }
@@ -106,6 +109,7 @@ class _IPodShellState extends State<IPodShell> implements Nav {
 
   /// Theta：左のタブ。そのタブの最初の画面からやり直す
   void _selectTab(int i) {
+    _focusNow = false;
     setState(() {
       _forward = i >= _tab;
       _tab = i;
@@ -121,9 +125,40 @@ class _IPodShellState extends State<IPodShell> implements Nav {
 
   /// Theta：再生中の曲を押したらキュー（前の曲も含めて全部）
   void _openQueue() {
+    _setFocusNow(false);
     if (_top.title == 'Now Playing') return;
     push(queueMenu());
   }
+
+  // ---------------------------------------------------------------- Theta のフォーカス（iPod に忠実に）
+  // リストにフォーカス：回す＝選ぶ、中央＝決定、MENU＝戻る（いちばん上の画面なら再生中へ）
+  // 再生中にフォーカス：回す＝音量（中央でシークに切り替え）、中央長押し＝お気に入り、MENU＝リストへ
+
+  bool _focusNow = false;
+  NowMode _nowMode = NowMode.progress;
+  Timer? _modeTimer;
+
+  void _setFocusNow(bool on) {
+    if (_focusNow == on && _nowMode == NowMode.progress) return;
+    _modeTimer?.cancel();
+    setState(() {
+      _focusNow = on;
+      _nowMode = NowMode.progress;
+    });
+  }
+
+  /// 音量・シークの表示は、しばらく触らなければふだんの表示に戻す（iPod と同じ）
+  void _setNowMode(NowMode m) {
+    _modeTimer?.cancel();
+    setState(() => _nowMode = m);
+    if (m != NowMode.progress) {
+      _modeTimer = Timer(Duration(seconds: m == NowMode.scrub ? 5 : 2), () {
+        if (mounted) setState(() => _nowMode = NowMode.progress);
+      });
+    }
+  }
+
+  bool get _nowFocused => widget.theta && _focusNow && services.player.hasQueue;
 
   String? _toast;
   Timer? _toastTimer;
@@ -145,6 +180,16 @@ class _IPodShellState extends State<IPodShell> implements Nav {
 
   void _onTick(int dir) {
     _click();
+    if (_nowFocused) {
+      if (_nowMode == NowMode.scrub) {
+        services.player.seekBy(Duration(seconds: 4 * dir));
+        _setNowMode(NowMode.scrub);
+      } else {
+        services.player.changeVolume(dir * 0.04);
+        _setNowMode(NowMode.volume);
+      }
+      return;
+    }
     _top.onScroll(dir);
   }
 
@@ -153,9 +198,19 @@ class _IPodShellState extends State<IPodShell> implements Nav {
     if (services.settings.clicker) Clicker.click(volume: 0.8);
     switch (b) {
       case WheelButton.menu:
-        pop();
+        if (_nowFocused) {
+          _setFocusNow(false); // 再生中 → リストへ
+        } else if (_stack.length > 1) {
+          pop();
+        } else if (widget.theta && services.player.hasQueue) {
+          _setFocusNow(true); // リストのいちばん上 → 再生中へ（iPod の Now Playing と同じ）
+        }
       case WheelButton.select:
-        _top.onSelect();
+        if (_nowFocused) {
+          _setNowMode(_nowMode == NowMode.scrub ? NowMode.progress : NowMode.scrub);
+        } else {
+          _top.onSelect();
+        }
       case WheelButton.playPause:
         services.player.toggle();
       case WheelButton.next:
@@ -169,7 +224,12 @@ class _IPodShellState extends State<IPodShell> implements Nav {
     if (b == WheelButton.select || b == WheelButton.menu) {
       if (services.settings.haptics) HapticFeedback.heavyImpact();
       if (b == WheelButton.select) {
-        _top.onLongSelect();
+        final t = services.player.current;
+        if (_nowFocused && t != null) {
+          toast(services.favorites.toggleTrack(t) ? '★ お気に入りに追加' : 'お気に入りから外しました');
+        } else {
+          _top.onLongSelect();
+        }
       } else {
         voiceSearch(); // MENU 長押しで音声検索
       }
@@ -190,6 +250,7 @@ class _IPodShellState extends State<IPodShell> implements Nav {
   void dispose() {
     _seekTimer?.cancel();
     _toastTimer?.cancel();
+    _modeTimer?.cancel();
     services.favorites.removeListener(_onFavorites);
     services.settings.removeListener(_onChange);
     services.player.removeListener(_onChange);
@@ -324,7 +385,14 @@ class _IPodShellState extends State<IPodShell> implements Nav {
               child: SafeArea(
                 child: LayoutBuilder(builder: (context, c) {
                   final list = _thetaList(p);
-                  final now = ThetaNowPanel(large: false, onOpen: _openQueue);
+                  Widget nowPanel(bool large) => ThetaNowPanel(
+                        large: large,
+                        focused: _nowFocused,
+                        mode: _nowMode,
+                        onTap: () => _setFocusNow(true),
+                        onLongPress: _openQueue,
+                      );
+                  final now = nowPanel(false);
                   if (c.maxWidth > c.maxHeight && c.maxWidth >= 600) {
                     // 横向き：左にリスト、右に再生中の曲とホイール
                     // 低い画面（横向きのスマホ）は曲の情報を小さい形に
@@ -339,9 +407,9 @@ class _IPodShellState extends State<IPodShell> implements Nav {
                           padding: const EdgeInsets.fromLTRB(4, 10, 12, 10),
                           child: Column(children: [
                             if (tall)
-                              Expanded(child: ThetaNowPanel(large: true, onOpen: _openQueue))
+                              Expanded(child: nowPanel(true))
                             else ...[
-                              ThetaNowPanel(large: false, onOpen: _openQueue),
+                              nowPanel(false),
                               const Spacer(),
                             ],
                             const SizedBox(height: 8),
@@ -370,6 +438,8 @@ class _IPodShellState extends State<IPodShell> implements Nav {
   /// 左のタブとリスト（今の画面）。見出しは「■ LIB.ARTISTS」とタイトル
   Widget _thetaList(Palette p) {
     final top = _top;
+    // ホイールがリストを操作していないときは、選んでいる行を控えめに
+    top.active = !_nowFocused;
     final depth = _stack.length;
     final code = thetaTabs[_tab].label;
     final panel = Container(
@@ -440,9 +510,13 @@ class _IPodShellState extends State<IPodShell> implements Nav {
       child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         ThetaTabs(active: _tab, onSelect: _selectTab),
         Expanded(
-          child: CustomPaint(
-            foregroundPainter: p.rounded ? null : CornersPainter(p.accent),
-            child: _withToast(panel, p),
+          // リストを触ったら、ホイールのフォーカスもリストへ
+          child: Listener(
+            onPointerDown: (_) => _setFocusNow(false),
+            child: CustomPaint(
+              foregroundPainter: p.rounded ? null : CornersPainter(_nowFocused ? p.line : p.accent),
+              child: _withToast(panel, p),
+            ),
           ),
         ),
       ]),

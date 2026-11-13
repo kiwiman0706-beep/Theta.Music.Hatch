@@ -121,5 +121,18 @@ class Artist {
   final List<Album> albums;
   Artist(this.name, this.albums);
   String get key => name.toLowerCase();
-  List<Track> get tracks => [for (final a in albums) ...a.tracks];
+  /// アルバム全部の曲（アルバムアーティストでまとめたもの）
+  List<Track> get albumTracks => [for (final a in albums) ...a.tracks];
+
+  /// このアーティストの曲。アルバムアーティストでまとめたアルバムには、ほかの歌手の曲
+  /// （オムニバス・プロデュース作・トリビュートなど）が入っていることがあるので、
+  /// 曲のアーティストにこの名前が入っている曲だけにする（無ければアルバムの曲全部）
+  List<Track> get tracks {
+    final all = albumTracks;
+    final mine = [
+      for (final t in all)
+        if (t.artist.isEmpty || t.artist.toLowerCase().contains(key)) t,
+    ];
+    return mine.isEmpty ? all : mine;
+  }
 }
