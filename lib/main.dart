@@ -4,7 +4,6 @@ import 'package:just_audio_background/just_audio_background.dart';
 
 import 'app.dart';
 import 'core/shelf.dart';
-import 'ui/hud/hud_shell.dart';
 import 'ui/hud/hud_theme.dart';
 import 'ui/screens.dart' show nav;
 import 'ui/shell.dart';
@@ -30,11 +29,7 @@ Future<void> main() async {
     services.player.playList(r.$1, 0, shuffle: r.$2);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       try {
-        if (services.settings.skin == 'theta') {
-          hudNav.selectTab(nowTab);
-        } else {
-          nav.showNowPlaying();
-        }
+        nav.showNowPlaying();
       } catch (_) {}
     });
   });
@@ -67,7 +62,7 @@ class ThetaMusicApp extends StatelessWidget {
             theme: hudMaterialTheme(paletteFor(s.hudTheme, Brightness.light)),
             darkTheme: hudMaterialTheme(paletteFor(s.hudTheme, Brightness.dark)),
             themeMode: ThemeMode.system,
-            home: const HudShell(),
+            home: const IPodShell(theta: true),
           );
         }
         return MaterialApp(

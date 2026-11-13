@@ -7,9 +7,9 @@ import '../core/obsidian.dart' show defaultVaultMusic;
 import '../core/search.dart';
 import '../core/series.dart';
 import '../core/settings.dart';
+import 'hud/skins.g.dart';
 import '../core/voice.dart';
 import 'dialogs.dart';
-import 'ipod_theme.dart';
 import 'screens.dart';
 
 void _play(List<Track> tracks, int i, {bool shuffle = false}) {
@@ -48,6 +48,7 @@ void _favToast(bool on) => nav.toast(on ? '★ お気に入りに追加' : 'お�
 
 MenuItem _trackItem(List<Track> list, int i) => MenuItem(
       list[i].title,
+      trackPath: list[i].path,
       starred: services.favorites.isTrack(list[i]),
       onSelect: () => _play(list, i),
       onLong: () => _favToast(services.favorites.toggleTrack(list[i])),
@@ -159,7 +160,7 @@ MenuScreen searchMenu(SearchResult r) => MenuScreen(
             onLong: () => _favToast(services.favorites.toggleTrack(r.tracks[i]))),
         MenuItem('Search Again', chevron: true, onSelect: voiceSearch),
       ],
-      deps: [services.favorites],
+      deps: [services.favorites, services.player],
     );
 
 // ------------------------------------------------------------- 一覧
@@ -183,7 +184,7 @@ MenuScreen artistsMenu() => MenuScreen(
       'Artists',
       () => [for (final a in services.library.artists) _artistItem(a)],
       letterIndex: true,
-      deps: [services.favorites],
+      deps: [services.favorites, services.player],
     );
 
 MenuScreen artistMenu(Artist a) => MenuScreen(
@@ -192,27 +193,27 @@ MenuScreen artistMenu(Artist a) => MenuScreen(
         MenuItem('All Songs', chevron: true, onSelect: () => nav.push(songsMenu(a.tracks, a.name, keepOrder: true))),
         for (final al in a.albums) _albumItem(al),
       ],
-      deps: [services.favorites],
+      deps: [services.favorites, services.player],
     );
 
 MenuScreen albumsMenu(List<Album> albums, String title) => MenuScreen(
       title,
       () => [for (final al in albums) _albumItem(al)],
       letterIndex: true,
-      deps: [services.favorites],
+      deps: [services.favorites, services.player],
     );
 
 MenuScreen albumMenu(Album al) => MenuScreen(
       al.title,
       () => [for (var i = 0; i < al.tracks.length; i++) _trackItem(al.tracks, i)],
-      deps: [services.favorites],
+      deps: [services.favorites, services.player],
     );
 
 MenuScreen songsMenu(List<Track> tracks, String title, {bool keepOrder = false}) => MenuScreen(
       title,
       () => [for (var i = 0; i < tracks.length; i++) _trackItem(tracks, i)],
       letterIndex: !keepOrder,
-      deps: [services.favorites],
+      deps: [services.favorites, services.player],
     );
 
 MenuScreen genresMenu() => MenuScreen(
@@ -271,10 +272,10 @@ InfoScreen scanScreen() => InfoScreen(
           IPodBar(s.running && s.tagsTotal == 0 ? 0 : (s.running ? frac : 1)),
           const SizedBox(height: 8),
           Text(s.status, maxLines: 3, overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 13, color: s.error != null ? Colors.red : LcdColors.sub)),
+              style: TextStyle(fontSize: 13, color: s.error != null ? Colors.red : subColor(context))),
           const Spacer(),
           Text(s.running ? '中央ボタンでキャンセル' : 'MENU で戻る',
-              style: const TextStyle(fontSize: 12, color: LcdColors.sub)),
+              style: TextStyle(fontSize: 12, color: subColor(context))),
         ]);
       },
       source: services.scanner,
@@ -291,7 +292,7 @@ InfoScreen exportScreen() => InfoScreen(
           const Text('Obsidian へ書き出し', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
           const SizedBox(height: 8),
           Text(services.settings.obsidianPath.isEmpty ? defaultVaultMusic : services.settings.obsidianPath,
-              style: const TextStyle(fontSize: 12, color: LcdColors.sub)),
+              style: TextStyle(fontSize: 12, color: subColor(context))),
           const SizedBox(height: 8),
           if (o.total > 0) Text('${o.done} / ${o.total} ノート'),
           const SizedBox(height: 8),
@@ -342,11 +343,20 @@ MenuScreen settingsMenu() {
     () => [
       MenuItem('Source', detail: s.source == MusicSource.dsaudio ? 'DS audio' : 'WebDAV', chevron: true,
           onSelect: () => showServerDialog(nav.context)),
-      MenuItem('Skin', detail: 'iPod', onSelect: () {
-        // ThetaHomeHatch 風の画面へ
-        s.skin = 'theta';
+      MenuItem('Skin', detail: s.skin == 'theta' ? 'Theta' : 'iPod', onSelect: () {
+        // iPod ⇄ Theta（シリーズのスキン。操作は同じ）
+        s.skin = s.skin == 'theta' ? 'ipod' : 'theta';
         save();
       }),
+      if (s.skin == 'theta') ...[
+        MenuItem('Theme', detail: skinLabels[s.hudTheme]?.split('（').first ?? 'System', chevron: true,
+            onSelect: () => nav.push(themeMenu())),
+        MenuItem('Follow Home', detail: s.followSeriesSkin ? 'On' : 'Off', onSelect: () {
+          // スキンを Theta Home Hatch（ui.skin）に合わせる
+          s.followSeriesSkin = !s.followSeriesSkin;
+          save();
+        }),
+      ],
       MenuItem('Shuffle', detail: s.shuffle ? 'Songs' : 'Off', onSelect: () {
         s.shuffle = !s.shuffle;
         save();
@@ -382,10 +392,16 @@ MenuScreen settingsMenu() {
           s.dsFavRating = switch (s.dsFavRating) { 4 => 5, 5 => 0, 0 => 3, _ => 4 };
           save();
         }),
-      MenuItem('Body Color', detail: s.blackBody ? 'Black' : 'Silver', onSelect: () {
-        s.blackBody = !s.blackBody;
-        save();
-      }),
+      if (s.skin != 'theta')
+        MenuItem('Body Color', detail: s.blackBody ? 'Black' : 'Silver', onSelect: () {
+          s.blackBody = !s.blackBody;
+          save();
+        }),
+      if (s.source == MusicSource.dsaudio)
+        MenuItem('Transcode', detail: s.dsTranscode ? 'MP3' : 'Off', onSelect: () {
+          s.dsTranscode = !s.dsTranscode;
+          save();
+        }),
       MenuItem('Read Tags', detail: s.readTags ? 'On' : 'Off', onSelect: () {
         s.readTags = !s.readTags;
         save();
@@ -415,11 +431,49 @@ MenuScreen settingsMenu() {
   );
 }
 
+/// Theta スキンのテーマ（シリーズの ui.skin）
+MenuScreen themeMenu() {
+  final s = services.settings;
+  return MenuScreen(
+    'Theme',
+    () => [
+      for (final t in skinNames)
+        MenuItem(t == 'system' ? 'System（端末に合わせる）' : (skinLabels[t] ?? t), detail: s.hudTheme == t ? '●' : null,
+            onSelect: () {
+          s.hudTheme = t;
+          s.save();
+          if (s.followSeriesSkin) Series.tell('ui.skin', t); // Home にも同じスキンを
+        }),
+    ],
+    deps: [s],
+  );
+}
+
+/// 再生中のキュー（今の曲を選んだ状態で開く。前の曲も含めて全部）
+MenuScreen queueMenu() {
+  final p = services.player;
+  final m = MenuScreen(
+    'Now Playing',
+    () => [
+      for (var i = 0; i < p.queue.length; i++)
+        MenuItem(p.queue[i].title,
+            detail: p.queue[i].displayArtist,
+            trackPath: p.queue[i].path,
+            starred: services.favorites.isTrack(p.queue[i]),
+            onSelect: () => p.jumpTo(i),
+            onLong: () => _favToast(services.favorites.toggleTrack(p.queue[i]))),
+    ],
+    deps: [p, services.favorites],
+  );
+  m.selected = p.index.clamp(0, p.queue.isEmpty ? 0 : p.queue.length - 1);
+  return m;
+}
+
 InfoScreen aboutScreen() => InfoScreen('About', (context) {
       final l = services.library;
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('Theta Music Hatch', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-        const Text('NAS (WebDAV / DS audio) + Tailscale', style: TextStyle(fontSize: 12, color: LcdColors.sub)),
+        Text('NAS (WebDAV / DS audio) + Tailscale', style: TextStyle(fontSize: 12, color: subColor(context))),
         FutureBuilder<String>(
           future: Series.version(),
           builder: (context, v) => Text('Version: ${v.data ?? ''}'),

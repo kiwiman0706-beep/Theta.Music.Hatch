@@ -47,18 +47,18 @@ Tailscale 経由で NAS の音楽を再生する Android 音楽プレーヤー�
   - かな/カナ・全角/半角・大文字小文字・空白の違いは無視。音声入力の候補（最大 5 つ）から、いちばん当たるものを選ぶ
   - 漢字の読みや、英語名をカタカナで認識された場合（「レディオヘッド」→ Radiohead）は当たらないことがある
 
-| 操作 | iPod スキン | Theta スキン |
+| 操作 | iPod スキン | Theta スキン（ホイールは iPod と同じ） |
 |---|---|---|
-| お気に入りに登録・解除 | 中央ボタン長押し（行の長押しも可） | ★ ボタン、または行の長押し |
-| お気に入りを見る | Favorites | FAVS タブ |
-| 音声検索 | MENU 長押し、または Search → Voice Search | 検索欄のマイク（NOW の検索欄はライブラリ全体） |
+| お気に入りに登録・解除 | 中央ボタン長押し（行の長押しも可） | 同じ |
+| お気に入りを見る | Favorites | 左のタブの FAVS |
+| 音声検索 | MENU 長押し、または Search → Voice Search | MENU 長押し、または左のタブの SEARCH |
 
 ## 見た目（スキン）
 
 | スキン | 内容 |
 |---|---|
 | iPod | 上に液晶、下にクリックホイール。Settings → Skin で切り替え |
-| Theta | ThetaHomeHatch と同じ HUD：黒地にオレンジ、細い線、角を落としたボタン、`[ CODE ]` の見出しと四隅のかぎ括弧、右端に縦書きのタブ（NOW / FAVS / ARTISTS / ALBUMS / SONGS / GENRES / FOLDERS / LIBRARY・SETUP）。テーマはシリーズのスキン 11 種（SYSTEM・DARK・LIGHT・POP・ALERT・SCI-FI・TERMINAL・BRAUN・SOFT・WINDOW・LCD。配色は Theta.Hatch.Series の `skins.json`）。既定は Theta Home Hatch のスキンに合わせる。SETUP → SKIN で切り替え |
+| Theta | iPod と同じ操作（リスト・クリックホイール・MENU で戻る）を、シリーズのスキン（HUD）の見た目で。横向き（タブレット）は左にタブ付きのリスト、右に再生中の曲とホイール。縦向きは上にリスト、下に再生中の曲とホイール。テーマはシリーズのスキン 11 種（SYSTEM・DARK・LIGHT・POP・ALERT・SCI-FI・TERMINAL・BRAUN・SOFT・WINDOW・LCD。配色は Theta.Hatch.Series の `skins.json`）。既定は Theta Home Hatch のスキンに合わせる。設定 → Skin・Theme で切り替え |
 
 Theta スキンの書体 Oswald・Share Tech Mono は SIL Open Font License（`docs/licenses`）。
 

@@ -8,14 +8,19 @@ import '../app.dart';
 import '../core/clicker.dart';
 import 'click_wheel.dart';
 import 'dialogs.dart';
+import 'hud/hud_theme.dart';
+import 'hud/hud_widgets.dart';
 import 'ipod_theme.dart';
 import 'menus.dart';
 import 'now_playing.dart';
 import 'screens.dart';
+import 'theta_layout.dart';
 
-/// 本体: 上に液晶、下にクリックホイール
+/// 本体: 上に液晶、下にクリックホイール。
+/// theta のときは同じ操作（画面の重ね方・ホイール）を、シリーズのスキン（HUD）の見た目と配置で描く
 class IPodShell extends StatefulWidget {
-  const IPodShell({super.key});
+  final bool theta;
+  const IPodShell({super.key, this.theta = false});
   @override
   State<IPodShell> createState() => _IPodShellState();
 }
@@ -29,7 +34,12 @@ class _IPodShellState extends State<IPodShell> implements Nav {
   void initState() {
     super.initState();
     nav = this;
-    _pushInternal(mainMenu());
+    if (widget.theta) {
+      _tab = services.settings.configured ? 0 : thetaTabs.length - 1; // 未設定なら SETUP
+      _pushInternal(thetaTabs[_tab].root());
+    } else {
+      _pushInternal(mainMenu());
+    }
     services.settings.addListener(_onChange);
     services.player.addListener(_onChange);
     services.favorites.addListener(_onFavorites);
@@ -86,8 +96,33 @@ class _IPodShellState extends State<IPodShell> implements Nav {
 
   @override
   void showNowPlaying() {
+    // Theta は再生中の曲がいつも見えているので、リストはそのまま（選んだ曲に印が付く）
+    if (widget.theta) return;
     if (_top is NowPlayingScreen) return;
     push(NowPlayingScreen());
+  }
+
+  int _tab = 0;
+
+  /// Theta：左のタブ。そのタブの最初の画面からやり直す
+  void _selectTab(int i) {
+    setState(() {
+      _forward = i >= _tab;
+      _tab = i;
+      for (final s in _stack) {
+        s.removeListener(_onChange);
+        s.detach();
+        Future<void>.delayed(const Duration(milliseconds: 400), s.dispose);
+      }
+      _stack.clear();
+      _pushInternal(thetaTabs[i].root());
+    });
+  }
+
+  /// Theta：再生中の曲を押したらキュー（前の曲も含めて全部）
+  void _openQueue() {
+    if (_top.title == 'Now Playing') return;
+    push(queueMenu());
   }
 
   String? _toast;
@@ -163,6 +198,7 @@ class _IPodShellState extends State<IPodShell> implements Nav {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.theta) return _thetaBuild(context);
     final colors = services.settings.blackBody ? IPodColors.black : IPodColors.silver;
     return PopScope(
       canPop: _stack.length <= 1,
@@ -250,7 +286,170 @@ class _IPodShellState extends State<IPodShell> implements Nav {
     );
   }
 
-  Widget _withToast(Widget lcd) {
+  // ---------------------------------------------------------------- Theta
+
+  Widget _thetaBuild(BuildContext context) {
+    final p = paletteFor(services.settings.hudTheme, MediaQuery.platformBrightnessOf(context));
+    // ホイールもスキンの色で
+    final wheelColors = IPodColors(
+      bodyTop: p.bg,
+      bodyBottom: p.bg,
+      wheel: p.raised,
+      wheelEdge: p.line,
+      wheelLabel: p.muted,
+      center: p.panel,
+      centerEdge: p.accent,
+    );
+    Widget wheel(double size) => ClickWheel(
+          size: size,
+          colors: wheelColors,
+          onTick: _onTick,
+          onButton: _onButton,
+          onHoldStart: _holdStart,
+          onHoldEnd: _holdEnd,
+        );
+    return HudScope(
+      palette: p,
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: p.isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+        child: PopScope(
+          canPop: _stack.length <= 1,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop) pop();
+          },
+          child: Scaffold(
+            backgroundColor: p.bg,
+            body: CustomPaint(
+              painter: BackdropPainter(p),
+              child: SafeArea(
+                child: LayoutBuilder(builder: (context, c) {
+                  final list = _thetaList(p);
+                  final now = ThetaNowPanel(large: false, onOpen: _openQueue);
+                  if (c.maxWidth > c.maxHeight && c.maxWidth >= 600) {
+                    // 横向き：左にリスト、右に再生中の曲とホイール
+                    // 低い画面（横向きのスマホ）は曲の情報を小さい形に
+                    final tall = c.maxHeight >= 520;
+                    final right = min(c.maxWidth * 0.4, 440.0);
+                    final w = min(right - 40, c.maxHeight * (tall ? 0.46 : 0.5));
+                    return Row(children: [
+                      Expanded(child: list),
+                      SizedBox(
+                        width: right,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(4, 10, 12, 10),
+                          child: Column(children: [
+                            if (tall)
+                              Expanded(child: ThetaNowPanel(large: true, onOpen: _openQueue))
+                            else ...[
+                              ThetaNowPanel(large: false, onOpen: _openQueue),
+                              const Spacer(),
+                            ],
+                            const SizedBox(height: 8),
+                            wheel(w),
+                          ]),
+                        ),
+                      ),
+                    ]);
+                  }
+                  // 縦向き：上にリスト、下に再生中の曲とホイール（iPod の縦と同じ並び）
+                  final w = min(c.maxWidth * 0.62, c.maxHeight * 0.28);
+                  return Column(children: [
+                    Expanded(child: list),
+                    Padding(padding: const EdgeInsets.fromLTRB(12, 4, 12, 6), child: now),
+                    Padding(padding: const EdgeInsets.only(bottom: 10), child: wheel(w)),
+                  ]);
+                }),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 左のタブとリスト（今の画面）。見出しは「■ LIB.ARTISTS」とタイトル
+  Widget _thetaList(Palette p) {
+    final top = _top;
+    final depth = _stack.length;
+    final code = thetaTabs[_tab].label;
+    final panel = Container(
+      decoration: BoxDecoration(
+        color: p.pop ? p.panel : null,
+        border: Border.all(color: p.line, width: p.lineWidth),
+        borderRadius: p.rounded ? BorderRadius.circular(p.radius) : null,
+      ),
+      clipBehavior: p.rounded ? Clip.antiAlias : Clip.none,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 6, 12, 6),
+          child: Row(children: [
+            SizedBox(
+              width: 40,
+              height: 36,
+              child: depth > 1
+                  ? IconButton(
+                      padding: EdgeInsets.zero,
+                      tooltip: '戻る（MENU）',
+                      onPressed: pop,
+                      icon: Icon(Icons.chevron_left, color: p.accent),
+                    )
+                  : Center(child: Container(width: 6, height: 6, color: p.accent)),
+            ),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(depth > 1 ? 'LIB.$code / ${depth - 1}' : 'LIB.$code',
+                    style: TextStyle(color: p.faint, fontSize: 10, letterSpacing: 2, fontFamily: p.mono)),
+                Text(top.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        color: p.fg,
+                        fontSize: 20,
+                        height: 1.2,
+                        fontFamily: p.display,
+                        fontWeight: p.pop ? FontWeight.bold : FontWeight.w400)),
+              ]),
+            ),
+          ]),
+        ),
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Stripes(color: p.line)),
+        const SizedBox(height: 4),
+        Expanded(
+          child: ClipRect(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              switchInCurve: Curves.easeOut,
+              switchOutCurve: Curves.easeIn,
+              layoutBuilder: (cur, prev) => Stack(children: [...prev, ?cur]),
+              transitionBuilder: (child, anim) {
+                final incoming = child.key == top.key;
+                final begin = incoming ? Offset(_forward ? 1 : -1, 0) : Offset(_forward ? -1 : 1, 0);
+                return SlideTransition(position: Tween(begin: begin, end: Offset.zero).animate(anim), child: child);
+              },
+              child: KeyedSubtree(
+                key: top.key,
+                child: ListenableBuilder(listenable: top, builder: (context, _) => top.build(context)),
+              ),
+            ),
+          ),
+        ),
+      ]),
+    );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        ThetaTabs(active: _tab, onSelect: _selectTab),
+        Expanded(
+          child: CustomPaint(
+            foregroundPainter: p.rounded ? null : CornersPainter(p.accent),
+            child: _withToast(panel, p),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  Widget _withToast(Widget lcd, [Palette? p]) {
     return Stack(children: [
       Positioned.fill(child: lcd),
       if (_toast != null)
@@ -262,14 +461,16 @@ class _IPodShellState extends State<IPodShell> implements Nav {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.72),
-                borderRadius: BorderRadius.circular(8),
+                color: p?.raised ?? Colors.black.withValues(alpha: 0.72),
+                border: p == null ? null : Border.all(color: p.accent),
+                borderRadius: BorderRadius.circular(p == null || p.rounded ? 8 : 0),
               ),
               child: Text(_toast!,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                  style: TextStyle(
+                      color: p?.fg ?? Colors.white, fontSize: 13, fontWeight: FontWeight.w600, fontFamily: p?.mono)),
             ),
           ),
         ),

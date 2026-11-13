@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../core/models.dart';
+import '../screens.dart' show ArtImage;
+
 import 'hud_theme.dart';
 
 /// ThetaHomeHatch の部品（ui/Bits.kt・Dashboard.kt）を Flutter に移したもの
@@ -548,5 +551,38 @@ class FavStar extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = HudScope.of(context);
     return Icon(on ? Icons.star : Icons.star_border, size: size, color: on ? p.accent : p.faint);
+  }
+}
+
+/// かぎ括弧付きのアルバムアート
+class HudArt extends StatelessWidget {
+  final ArtRef? art;
+  final double? size;
+  const HudArt(this.art, {super.key, this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    final ph = Container(
+      color: p.raised,
+      alignment: Alignment.center,
+      child: LayoutBuilder(
+        builder: (context, c) => Icon(Icons.album_outlined, color: p.faint, size: (c.maxWidth * 0.4).clamp(14, 64)),
+      ),
+    );
+    Widget img = ArtImage(art, key: ValueKey(art?.key), placeholder: ph);
+    img = Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: p.line, width: p.lineWidth),
+        borderRadius: BorderRadius.circular(p.pop ? 8 : 0),
+      ),
+      clipBehavior: p.pop ? Clip.antiAlias : Clip.none,
+      child: img,
+    );
+    if (!p.pop) {
+      img = CustomPaint(foregroundPainter: CornersPainter(p.accent, length: size != null && size! < 60 ? 5 : 9), child: img);
+    }
+    if (size != null) return SizedBox(width: size, height: size, child: img);
+    return AspectRatio(aspectRatio: 1, child: img);
   }
 }

@@ -26,8 +26,15 @@ class Player extends ChangeNotifier {
   double volume = 1.0;
 
   Player(this.settings, this.art, this.ds) {
-    audio.currentIndexStream.listen((i) {
-      if (i != null && i != index) {
+    // 今の曲は、再生エンジンが流している曲（tag の id＝曲のパス）から決める。
+    // 曲順を入れ替えている途中に前の曲順の番号が届いても、今の曲順と合わなければ使わない
+    // （前は番号だけで追っていたので、違う曲名が出ることがあった）
+    audio.sequenceStateStream.listen((st) {
+      final i = st.currentIndex;
+      final tag = st.currentSource?.tag;
+      if (i == null || tag is! MediaItem) return;
+      if (st.sequence.length != queue.length || i >= queue.length || queue[i].path != tag.id) return;
+      if (i != index) {
         index = i;
         _retries = 0;
         notifyListeners();

@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 
 import '../app.dart';
 import '../core/models.dart';
+import 'hud/hud_theme.dart';
+import 'hud/hud_widgets.dart';
 import 'ipod_theme.dart';
 
 /// 画面スタックの操作（Shell が実装）
@@ -39,7 +41,9 @@ class MenuItem {
   final VoidCallback? onSelect;
   final VoidCallback? onLong; // 中央ボタン長押し・行の長押し
   final bool starred;
-  const MenuItem(this.label, {this.detail, this.chevron = false, this.onSelect, this.onLong, this.starred = false});
+  final String? trackPath; // 曲の行：再生中なら印を出す
+  const MenuItem(this.label,
+      {this.detail, this.chevron = false, this.onSelect, this.onLong, this.starred = false, this.trackPath});
 }
 
 /// リスト形式のメニュー画面
@@ -143,20 +147,28 @@ class MenuScreen extends IPodScreen {
 
   @override
   Widget build(BuildContext context) {
+    final hud = HudScope.maybeOf(context); // Theta スキン（同じ操作を HUD の見た目で）
+    final playing = services.player.current?.path;
     final list = LayoutBuilder(builder: (context, c) {
       _viewport = c.maxHeight;
-      final rows = (c.maxHeight / 34).floor().clamp(5, 12);
-      _rowH = c.maxHeight / rows;
+      if (hud != null) {
+        _rowH = 46;
+      } else {
+        final rows = (c.maxHeight / 34).floor().clamp(5, 12);
+        _rowH = c.maxHeight / rows;
+      }
       WidgetsBinding.instance.addPostFrameCallback((_) => _ensureVisible());
       if (items.isEmpty) {
-        return const Center(child: Text('No items', style: TextStyle(color: LcdColors.sub)));
+        return Center(child: Text('No items', style: TextStyle(color: hud?.faint ?? LcdColors.sub)));
       }
       return ListView.builder(
         controller: scroll,
         physics: const ClampingScrollPhysics(),
         itemExtent: _rowH,
         itemCount: items.length,
-        itemBuilder: (context, i) => _row(items[i], i == selected, i),
+        itemBuilder: (context, i) => hud != null
+            ? _hudRow(hud, items[i], i == selected, i, playing)
+            : _row(items[i], i == selected, i),
       );
     });
     final body = splitArt
@@ -178,6 +190,49 @@ class MenuScreen extends IPodScreen {
           ),
         ),
     ]);
+  }
+
+  void _tap(int i, VoidCallback? f) {
+    selected = i;
+    notifyListeners();
+    f?.call();
+  }
+
+  /// Theta スキンの行：縞模様、選んでいる行はアクセント色、再生中の曲に印
+  Widget _hudRow(Palette p, MenuItem it, bool sel, int i, String? playing) {
+    final fg = sel ? p.onAccent : p.fg;
+    final now = it.trackPath != null && it.trackPath == playing;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _tap(i, it.onSelect),
+      onLongPress: it.onLong == null ? null : () => _tap(i, it.onLong),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: sel ? p.accent : (i.isOdd ? p.zebra : null),
+          borderRadius: p.rounded && sel ? BorderRadius.circular(6) : null,
+        ),
+        child: Row(children: [
+          if (now)
+            Padding(padding: const EdgeInsets.only(right: 8), child: Icon(Icons.graphic_eq, size: 18, color: sel ? fg : p.accent)),
+          if (it.starred)
+            Padding(padding: const EdgeInsets.only(right: 6), child: Icon(Icons.star, size: 16, color: sel ? fg : p.accent)),
+          Expanded(
+            child: Text(it.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: now && !sel ? p.accent : fg, fontSize: 15)),
+          ),
+          if (it.detail != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: Text(it.detail!,
+                  style: TextStyle(color: sel ? fg : p.faint, fontSize: 12, fontFamily: p.mono, letterSpacing: 0.5)),
+            ),
+          if (it.chevron) Icon(Icons.chevron_right, color: sel ? fg : p.faint, size: 20),
+        ]),
+      ),
+    );
   }
 
   Widget _row(MenuItem it, bool sel, int i) {
@@ -350,11 +405,14 @@ class InfoScreen extends IPodScreen {
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.all(12),
         child: DefaultTextStyle(
-          style: const TextStyle(color: LcdColors.text, fontSize: 15, height: 1.35),
+          style: TextStyle(color: HudScope.maybeOf(context)?.fg ?? LcdColors.text, fontSize: 15, height: 1.35),
           child: content(context),
         ),
       );
 }
+
+/// 補足の文字の色（iPod は灰色、Theta はスキンの muted）
+Color subColor(BuildContext context) => HudScope.maybeOf(context)?.muted ?? LcdColors.sub;
 
 /// iPod 風プログレスバー
 class IPodBar extends StatelessWidget {
@@ -365,6 +423,7 @@ class IPodBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final v = value.isNaN ? 0.0 : value.clamp(0.0, 1.0);
+    if (HudScope.maybeOf(context) != null) return HudProgress(v);
     return LayoutBuilder(builder: (context, c) {
       return SizedBox(
         height: 14,

@@ -103,6 +103,9 @@ class HudScope extends InheritedWidget {
   static Palette of(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<HudScope>()?.palette ?? darkPalette;
 
+  /// Theta スキンのときだけ配色（iPod スキンでは null）
+  static Palette? maybeOf(BuildContext context) => context.dependOnInheritedWidgetOfExactType<HudScope>()?.palette;
+
   @override
   bool updateShouldNotify(HudScope old) => old.palette != palette;
 }
