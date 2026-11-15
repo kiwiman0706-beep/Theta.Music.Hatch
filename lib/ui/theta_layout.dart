@@ -12,26 +12,46 @@ import 'visualizer_view.dart';
 
 class ThetaTab {
   final String label;
+  final String title; // モードの一覧での名前
   final IconData icon;
   final int group; // 0 よく使う（accent）・1 ライブラリ（widget）・2 管理（launch）
   final IPodScreen Function() root;
-  const ThetaTab(this.label, this.icon, this.group, this.root);
+  const ThetaTab(this.label, this.title, this.icon, this.group, this.root);
 }
 
 /// ライブラリが空のときは、どのタブも「更新・接続設定」の案内（musicMenu）にする
 IPodScreen _lib(IPodScreen Function() f) => services.library.tracks.isEmpty ? musicMenu() : f();
 
+/// モード（iPod の Music メニューと同じ並び。いちばん上はお気に入り）
 final thetaTabs = <ThetaTab>[
-  ThetaTab('ARTISTS', Icons.person_outline, 1, () => _lib(artistsMenu)),
-  ThetaTab('ALBUMS', Icons.album_outlined, 1, () => _lib(() => albumsMenu(services.library.albums, 'Albums'))),
-  ThetaTab('SONGS', Icons.music_note_outlined, 1, () => _lib(() => songsMenu(services.library.songs, 'Songs'))),
-  ThetaTab('GENRES', Icons.category_outlined, 1, () => _lib(genresMenu)),
-  ThetaTab('FOLDERS', Icons.folder_outlined, 1, () => _lib(() => folderMenu(services.library.root))),
-  ThetaTab('FAVS', Icons.star_border, 0, favoritesMenu),
-  ThetaTab('SEARCH', Icons.search, 0, searchStartMenu),
-  ThetaTab('LIBRARY', Icons.library_music_outlined, 2, libraryMenu),
-  ThetaTab('SETUP', Icons.tune, 2, settingsMenu),
+  ThetaTab('FAVS', 'Favorites', Icons.star_border, 0, favoritesMenu),
+  ThetaTab('ARTISTS', 'Artists', Icons.person_outline, 1, () => _lib(artistsMenu)),
+  ThetaTab('ALBUMS', 'Albums', Icons.album_outlined, 1,
+      () => _lib(() => albumsMenu(services.library.albums, 'Albums'))),
+  ThetaTab('SONGS', 'Songs', Icons.music_note_outlined, 1,
+      () => _lib(() => songsMenu(services.library.songs, 'Songs'))),
+  ThetaTab('GENRES', 'Genres', Icons.category_outlined, 1, () => _lib(genresMenu)),
+  ThetaTab('FOLDERS', 'Folders', Icons.folder_outlined, 1, () => _lib(() => folderMenu(services.library.root))),
+  ThetaTab('SEARCH', 'Search', Icons.search, 0, searchStartMenu),
+  ThetaTab('LIBRARY', 'Library', Icons.library_music_outlined, 2, libraryMenu),
+  ThetaTab('SETUP', 'Settings', Icons.tune, 2, settingsMenu),
 ];
+
+/// いちばん上の階層：モードの切り替え（アーティストなどの一覧で MENU を押すとここへ戻る）
+MenuScreen modeMenu(void Function(int) open) => MenuScreen(
+      'Music',
+      () => [
+        for (var i = 0; i < thetaTabs.length; i++)
+          MenuItem(thetaTabs[i].title, chevron: true, starred: i == 0, onSelect: () => open(i)),
+        MenuItem('Shuffle Songs', onSelect: () {
+          final s = services.library.songs;
+          if (s.isNotEmpty) {
+            services.player.playList(s, 0, shuffle: true);
+            nav.showNowPlaying();
+          }
+        }),
+      ],
+    );
 
 /// リストの左に付く縦のタブ（ThetaHomeHatch の端のタブと同じ作り。低いときは印だけ）
 class ThetaTabs extends StatelessWidget {

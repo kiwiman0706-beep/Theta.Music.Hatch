@@ -35,8 +35,10 @@ class _IPodShellState extends State<IPodShell> implements Nav {
     super.initState();
     nav = this;
     if (widget.theta) {
-      _tab = services.settings.configured ? 0 : thetaTabs.length - 1; // 未設定なら SETUP
-      _pushInternal(thetaTabs[_tab].root());
+      // いちばん上はモードの一覧（iPod の Music メニュー）。未設定なら SETUP を開く
+      _modes = modeMenu(_selectTab);
+      _pushInternal(_modes);
+      if (!services.settings.configured) _selectTab(thetaTabs.length - 1, animate: false);
     } else {
       _pushInternal(mainMenu());
     }
@@ -85,6 +87,7 @@ class _IPodShellState extends State<IPodShell> implements Nav {
     setState(() {
       _forward = false;
       final s = _stack.removeLast();
+      if (widget.theta && _stack.length == 1) _tab = -1; // モードの一覧に戻った
       s.removeListener(_onChange);
       s.detach();
       // アニメーション終了後に破棄
@@ -105,22 +108,29 @@ class _IPodShellState extends State<IPodShell> implements Nav {
     push(NowPlayingScreen());
   }
 
-  int _tab = 0;
+  /// Theta：今のモード（左のタブ）。モードの一覧にいるときは -1
+  int _tab = -1;
+  late MenuScreen _modes;
 
-  /// Theta：左のタブ。そのタブの最初の画面からやり直す
-  void _selectTab(int i) {
+  /// Theta：モードを開く（左のタブ・モードの一覧から）。モードの一覧の上に、そのモードの最初の画面を重ねる
+  void _selectTab(int i, {bool animate = true}) {
     _focusNow = false;
-    setState(() {
-      _forward = i >= _tab;
-      _tab = i;
+    void go() {
+      _forward = true;
       for (final s in _stack) {
         s.removeListener(_onChange);
         s.detach();
-        Future<void>.delayed(const Duration(milliseconds: 400), s.dispose);
+        if (s != _modes) Future<void>.delayed(const Duration(milliseconds: 400), s.dispose);
       }
-      _stack.clear();
+      _stack
+        ..clear()
+        ..add(_modes);
+      _modes.selected = i; // MENU で戻ったとき、このモードが選ばれている
+      _tab = i;
       _pushInternal(thetaTabs[i].root());
-    });
+    }
+
+    animate ? setState(go) : go();
   }
 
   /// Theta：再生中の曲を押したらキュー（前の曲も含めて全部）
@@ -471,7 +481,7 @@ class _IPodShellState extends State<IPodShell> implements Nav {
     // ホイールがリストを操作していないときは、選んでいる行を控えめに
     top.active = !_nowFocused;
     final depth = _stack.length;
-    final code = thetaTabs[_tab].label;
+    final code = _tab < 0 ? 'MUSIC' : thetaTabs[_tab].label;
     final panel = Container(
       decoration: BoxDecoration(
         color: p.pop ? p.panel : null,
@@ -497,7 +507,7 @@ class _IPodShellState extends State<IPodShell> implements Nav {
             ),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(depth > 1 ? 'LIB.$code / ${depth - 1}' : 'LIB.$code',
+                Text(depth > 2 ? 'LIB.$code / ${depth - 2}' : 'LIB.$code',
                     style: TextStyle(color: p.faint, fontSize: 10, letterSpacing: 2, fontFamily: p.mono)),
                 Text(top.title,
                     maxLines: 1,
