@@ -178,8 +178,10 @@ MenuScreen musicMenu() => MenuScreen(
           ? _emptyHint()
           : [
               MenuItem('Artists', chevron: true, onSelect: () => nav.push(artistsMenu())),
-              MenuItem('Albums', chevron: true, onSelect: () => nav.push(albumsMenu(services.library.albums, 'Albums'))),
-              MenuItem('Songs', chevron: true, onSelect: () => nav.push(songsMenu(services.library.songs, 'Songs'))),
+              MenuItem('Albums', chevron: true,
+                  onSelect: () => nav.push(albumsMenu(services.library.albums, 'Albums', pinFavorites: true))),
+              MenuItem('Songs', chevron: true,
+                  onSelect: () => nav.push(songsMenu(services.library.songs, 'Songs', pinFavorites: true))),
               MenuItem('Genres', chevron: true, onSelect: () => nav.push(genresMenu())),
               MenuItem('Folders', chevron: true,
                   onSelect: () => nav.push(folderMenu(services.library.root))),
@@ -187,11 +189,17 @@ MenuScreen musicMenu() => MenuScreen(
       deps: [services.library],
     );
 
+bool get _favFirst => services.settings.favoritesFirst;
+
 MenuScreen artistsMenu() => MenuScreen(
       'Artists',
-      () => [for (final a in services.library.artists) _artistItem(a)],
+      () => [
+        // 先頭に ☆ お気に入り（一覧の本体にもそのまま残る）
+        if (_favFirst) for (final a in services.favorites.artists) _artistItem(a),
+        for (final a in services.library.artists) _artistItem(a),
+      ],
       letterIndex: true,
-      deps: [services.favorites, services.player],
+      deps: [services.favorites, services.player, services.settings],
     );
 
 MenuScreen artistMenu(Artist a) => MenuScreen(
@@ -203,11 +211,15 @@ MenuScreen artistMenu(Artist a) => MenuScreen(
       deps: [services.favorites, services.player],
     );
 
-MenuScreen albumsMenu(List<Album> albums, String title) => MenuScreen(
+/// pinFavorites：先頭に ☆ お気に入りのアルバム（全部のアルバムの一覧のとき）
+MenuScreen albumsMenu(List<Album> albums, String title, {bool pinFavorites = false}) => MenuScreen(
       title,
-      () => [for (final al in albums) _albumItem(al)],
+      () => [
+        if (pinFavorites && _favFirst) for (final al in services.favorites.albums) _albumItem(al),
+        for (final al in albums) _albumItem(al),
+      ],
       letterIndex: true,
-      deps: [services.favorites, services.player],
+      deps: [services.favorites, services.player, services.settings],
     );
 
 MenuScreen albumMenu(Album al) => MenuScreen(
@@ -216,11 +228,23 @@ MenuScreen albumMenu(Album al) => MenuScreen(
       deps: [services.favorites, services.player],
     );
 
-MenuScreen songsMenu(List<Track> tracks, String title, {bool keepOrder = false}) => MenuScreen(
+/// pinFavorites：先頭に ☆ お気に入りの曲（全部の曲の一覧のとき）。押すと全部の曲の中のその曲から流す
+MenuScreen songsMenu(List<Track> tracks, String title, {bool keepOrder = false, bool pinFavorites = false}) =>
+    MenuScreen(
       title,
-      () => [for (var i = 0; i < tracks.length; i++) _trackItem(tracks, i)],
+      () {
+        final pinned = <MenuItem>[];
+        if (pinFavorites && _favFirst) {
+          final at = {for (var i = 0; i < tracks.length; i++) tracks[i].path: i};
+          for (final t in services.favorites.tracks) {
+            final i = at[t.path];
+            if (i != null) pinned.add(_trackItem(tracks, i));
+          }
+        }
+        return [...pinned, for (var i = 0; i < tracks.length; i++) _trackItem(tracks, i)];
+      },
       letterIndex: !keepOrder,
-      deps: [services.favorites, services.player],
+      deps: [services.favorites, services.player, services.settings],
     );
 
 MenuScreen genresMenu() => MenuScreen(
@@ -389,6 +413,11 @@ MenuScreen settingsMenu() {
           return;
         }
         s.visualizer = next;
+        save();
+      }),
+      MenuItem('Favorites First', detail: s.favoritesFirst ? 'On' : 'Off', onSelect: () {
+        // アーティスト・アルバム・曲の一覧の先頭に ☆ お気に入り
+        s.favoritesFirst = !s.favoritesFirst;
         save();
       }),
       MenuItem('Wheel Guide', detail: s.wheelGuide ? 'On' : 'Off', onSelect: () {

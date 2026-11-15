@@ -29,6 +29,8 @@ class AppSettings extends ChangeNotifier {
   String visualizer = 'off';
   /// ホイールに、その時の操作の案内（MENU で上の階層へ・← VOLUME → など）を出す
   bool wheelGuide = true;
+  /// アーティスト・アルバム・曲の一覧の先頭に、☆ お気に入りをまとめて出す
+  bool favoritesFirst = true;
   bool blackBody = false;
   bool shuffle = false;
   RepeatSetting repeat = RepeatSetting.off;
@@ -66,6 +68,7 @@ class AppSettings extends ChangeNotifier {
     haptics = _p.getBool('haptics') ?? true;
     visualizer = _p.getString('visualizer') ?? 'off';
     wheelGuide = _p.getBool('wheelGuide') ?? true;
+    favoritesFirst = _p.getBool('favoritesFirst') ?? true;
     dsFavRating = _p.getInt('dsFavRating') ?? 4;
     shelfFavorites = _p.getBool('shelfFavorites') ?? true;
     shelfRecent = _p.getBool('shelfRecent') ?? true;
@@ -117,6 +120,7 @@ class AppSettings extends ChangeNotifier {
     await _p.setBool('haptics', haptics);
     await _p.setString('visualizer', visualizer);
     await _p.setBool('wheelGuide', wheelGuide);
+    await _p.setBool('favoritesFirst', favoritesFirst);
     await _p.setInt('dsFavRating', dsFavRating);
     await _p.setBool('shelfFavorites', shelfFavorites);
     await _p.setBool('shelfRecent', shelfRecent);
