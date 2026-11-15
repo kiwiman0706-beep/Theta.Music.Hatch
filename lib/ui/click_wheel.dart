@@ -7,6 +7,16 @@ import 'ipod_theme.dart';
 
 enum WheelButton { menu, next, previous, playPause, select }
 
+/// ホイールに出す案内（その時に押すと何が起きるか）。液晶なので状況に合わせて書き換える
+class WheelGuide {
+  final String? menu; // MENU の下：上の階層へ・再生中へ・リストへ
+  final String? menuHold; // MENU の長押し
+  final String? center; // 中央：SELECT・SEEK・VOLUME
+  final String? centerHold; // 中央の長押し
+  final String? ring; // リング：← VOLUME → など（8 時から 4 時に沿って）
+  const WheelGuide({this.menu, this.menuHold, this.center, this.centerHold, this.ring});
+}
+
 /// iPod のクリックホイール。リングをなぞると回転イベント、
 /// 上下左右/中央のタップでボタンイベント、◀◀/▶▶ 長押しで早送り/巻き戻し、
 /// 中央・MENU の長押しは onHoldStart で受ける（お気に入り・音声検索）。
@@ -17,6 +27,7 @@ class ClickWheel extends StatefulWidget {
   final void Function(WheelButton b) onButton;
   final void Function(WheelButton b)? onHoldStart;
   final void Function(WheelButton b)? onHoldEnd;
+  final WheelGuide? guide;
 
   const ClickWheel({
     super.key,
@@ -26,6 +37,7 @@ class ClickWheel extends StatefulWidget {
     required this.onButton,
     this.onHoldStart,
     this.onHoldEnd,
+    this.guide,
   });
 
   @override
@@ -154,6 +166,8 @@ class _ClickWheelState extends State<ClickWheel> {
     final s = widget.size;
     final label = c.wheelLabel;
     final iconSize = s * 0.085;
+    final g = widget.guide;
+    final small = TextStyle(color: label, fontSize: max(9.0, s * 0.03), height: 1.25);
     Widget pressable(WheelButton b, Widget child) => AnimatedOpacity(
           duration: const Duration(milliseconds: 80),
           opacity: _pressed == b ? 0.45 : 1,
@@ -181,17 +195,35 @@ class _ClickWheelState extends State<ClickWheel> {
                 ],
               ),
             ),
+            // リングの案内（← VOLUME → など）。8 時から 4 時まで、下側の縁に沿って
+            if (g?.ring != null)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: CustomPaint(
+                    painter: _ArcTextPainter(g!.ring!, TextStyle(
+                      color: label.withValues(alpha: 0.85),
+                      fontSize: max(10.0, s * 0.04),
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: s * 0.004,
+                    )),
+                  ),
+                ),
+              ),
             Positioned(
-              top: s * 0.075,
+              top: s * 0.065,
               child: pressable(
                 WheelButton.menu,
-                Text('MENU',
-                    style: TextStyle(
-                      color: label,
-                      fontSize: s * 0.062,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.2,
-                    )),
+                Column(mainAxisSize: MainAxisSize.min, children: [
+                  Text('MENU',
+                      style: TextStyle(
+                        color: label,
+                        fontSize: s * 0.062,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                      )),
+                  if (g?.menu != null) Text(g!.menu!, style: small),
+                  if (g?.menuHold != null) Text(g!.menuHold!, style: small.copyWith(color: label.withValues(alpha: 0.6))),
+                ]),
               ),
             ),
             Positioned(
@@ -227,10 +259,53 @@ class _ClickWheelState extends State<ClickWheel> {
                 ),
                 border: Border.all(color: c.centerEdge, width: 1),
               ),
+              alignment: Alignment.center,
+              // 中央ボタンの案内（SELECT・SEEK など）
+              child: g?.center == null
+                  ? null
+                  : Column(mainAxisSize: MainAxisSize.min, children: [
+                      Text(g!.center!,
+                          style: TextStyle(
+                              color: label, fontSize: s * 0.042, fontWeight: FontWeight.w700, letterSpacing: s * 0.003)),
+                      if (g.centerHold != null)
+                        Text(g.centerHold!, style: small.copyWith(color: label.withValues(alpha: 0.6))),
+                    ]),
             ),
           ],
         ),
       ),
     );
   }
+}
+
+/// 文字を円弧に沿って並べる（下側の縁。文字の上は中心を向く）
+class _ArcTextPainter extends CustomPainter {
+  final String text;
+  final TextStyle style;
+  _ArcTextPainter(this.text, this.style);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = Offset(size.width / 2, size.height / 2);
+    final r = size.width / 2 * 0.895;
+    final glyphs = [
+      for (final ch in text.characters)
+        TextPainter(text: TextSpan(text: ch, style: style), textDirection: TextDirection.ltr)..layout(),
+    ];
+    final total = glyphs.fold<double>(0, (a, g) => a + g.width);
+    // 6 時（真下＝π/2）を中心に、左（8 時側）から右（4 時側）へ
+    var a = pi / 2 + total / r / 2;
+    for (final g in glyphs) {
+      final mid = a - g.width / r / 2;
+      canvas.save();
+      canvas.translate(c.dx + r * cos(mid), c.dy + r * sin(mid));
+      canvas.rotate(mid - pi / 2);
+      g.paint(canvas, Offset(-g.width / 2, -g.height / 2));
+      canvas.restore();
+      a -= g.width / r;
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ArcTextPainter old) => old.text != text || old.style != style;
 }

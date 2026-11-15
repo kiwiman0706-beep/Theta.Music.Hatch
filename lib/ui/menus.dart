@@ -391,6 +391,11 @@ MenuScreen settingsMenu() {
         s.visualizer = next;
         save();
       }),
+      MenuItem('Wheel Guide', detail: s.wheelGuide ? 'On' : 'Off', onSelect: () {
+        // ホイールに、その時の操作の案内を出す
+        s.wheelGuide = !s.wheelGuide;
+        save();
+      }),
       MenuItem('Haptics', detail: s.haptics ? 'On' : 'Off', onSelect: () {
         s.haptics = !s.haptics;
         save();

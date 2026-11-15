@@ -160,6 +160,34 @@ class _IPodShellState extends State<IPodShell> implements Nav {
 
   bool get _nowFocused => widget.theta && _focusNow && services.player.hasQueue;
 
+  /// ホイールに出す案内：その時に押すと何が起きるか（設定 → Wheel Guide で消せる）
+  WheelGuide? get _guide {
+    if (!services.settings.wheelGuide) return null;
+    const voice = '長押し 音声検索';
+    const fav = '長押し ★';
+    final top = _top;
+    // 再生中（Theta のパネル・iPod の Now Playing）：回す＝音量、中央＝シーク
+    if (_nowFocused || top is NowPlayingScreen) {
+      final scrub = _nowFocused ? _nowMode == NowMode.scrub : (top as NowPlayingScreen).scrubbing;
+      return WheelGuide(
+        menu: widget.theta ? 'リストへ' : '戻る',
+        menuHold: voice,
+        center: scrub ? 'VOLUME' : 'SEEK',
+        centerHold: fav,
+        ring: scrub ? '←  SEEK  →' : '←  VOLUME  →',
+      );
+    }
+    // リスト：回す＝選ぶ、中央＝決定、MENU＝上の階層へ（いちばん上なら再生中へ）
+    final list = top is MenuScreen && top.items.isNotEmpty;
+    return WheelGuide(
+      menu: _stack.length > 1 ? '上の階層へ' : (widget.theta && services.player.hasQueue ? '再生中へ' : null),
+      menuHold: voice,
+      center: list ? 'SELECT' : null,
+      centerHold: list && top.items[top.selected].onLong != null ? fav : null,
+      ring: list ? '←  SELECT  →' : null,
+    );
+  }
+
   String? _toast;
   Timer? _toastTimer;
 
@@ -293,6 +321,7 @@ class _IPodShellState extends State<IPodShell> implements Nav {
                       onButton: _onButton,
                       onHoldStart: _holdStart,
                       onHoldEnd: _holdEnd,
+                      guide: _guide,
                     ),
                   ),
                 ),
@@ -368,6 +397,7 @@ class _IPodShellState extends State<IPodShell> implements Nav {
           onButton: _onButton,
           onHoldStart: _holdStart,
           onHoldEnd: _holdEnd,
+          guide: _guide,
         );
     return HudScope(
       palette: p,

@@ -15,6 +15,9 @@ class NowPlayingScreen extends IPodScreen {
   String get title => 'Now Playing';
 
   _Mode _mode = _Mode.progress;
+
+  /// 中央ボタンでシーク中か（ホイールの案内に使う）
+  bool get scrubbing => _mode == _Mode.scrub;
   Timer? _modeTimer;
 
   @override

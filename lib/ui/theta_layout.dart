@@ -193,7 +193,7 @@ class ThetaNowPanel extends StatelessWidget {
             const Spacer(),
             if (mode == NowMode.scrub)
               Text('◀ SEEK ▶', style: label.copyWith(color: p.accent))
-            else if (focused)
+            else if (focused && !services.settings.wheelGuide)
               Text('回す 音量 ・ 中央 シーク ・ MENU リスト', style: label.copyWith(letterSpacing: 0, fontSize: 10)),
             const Spacer(),
             Text('-${_fmt(remain.isNegative ? Duration.zero : remain)}', style: label),
