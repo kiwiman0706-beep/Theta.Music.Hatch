@@ -57,13 +57,18 @@ MenuScreen modeMenu(void Function(int) open) => MenuScreen(
 class ThetaTabs extends StatelessWidget {
   final int active;
   final void Function(int) onSelect;
-  const ThetaTabs({super.key, required this.active, required this.onSelect});
+
+  /// 文字（ARTISTS など）も出す：横に広げて、印と文字を並べる
+  final bool labels;
+  const ThetaTabs({super.key, required this.active, required this.onSelect, this.labels = false});
 
   @override
   Widget build(BuildContext context) {
     final p = HudScope.of(context);
-    return SizedBox(
-      width: 40,
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      width: labels ? 116 : 40,
       child: Column(
         children: [
           for (var i = 0; i < thetaTabs.length; i++) ...[
@@ -102,7 +107,24 @@ class ThetaTabs extends StatelessWidget {
               ),
               LayoutBuilder(
                 builder: (context, c) => Center(
-                  child: c.maxHeight < 64
+                  child: c.maxWidth >= 90
+                      ? Padding(
+                          padding: const EdgeInsets.only(left: 8, right: 8),
+                          child: Row(children: [
+                            Icon(t.icon, size: 18, color: fg),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(t.label,
+                                    maxLines: 1,
+                                    style: TextStyle(fontSize: 12, letterSpacing: 1.2, fontFamily: p.mono, color: fg)),
+                              ),
+                            ),
+                          ]),
+                        )
+                      : c.maxWidth < 30 || c.maxHeight < 64
                       ? Icon(t.icon, size: 19, color: fg)
                       : FittedBox(
                           fit: BoxFit.scaleDown,

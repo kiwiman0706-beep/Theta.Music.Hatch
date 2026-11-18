@@ -112,9 +112,13 @@ class _IPodShellState extends State<IPodShell> implements Nav {
   int _tab = -1;
   late MenuScreen _modes;
 
+  /// Theta：いちばん上（モードの一覧）で MENU を押して、左のタブを文字付きに広げている
+  bool _railOpen = false;
+
   /// Theta：モードを開く（左のタブ・モードの一覧から）。モードの一覧の上に、そのモードの最初の画面を重ねる
   void _selectTab(int i, {bool animate = true}) {
     _focusNow = false;
+    _railOpen = false;
     void go() {
       _forward = true;
       for (final s in _stack) {
@@ -190,7 +194,15 @@ class _IPodShellState extends State<IPodShell> implements Nav {
     // リスト：回す＝選ぶ、中央＝決定、MENU＝上の階層へ（いちばん上なら再生中へ）
     final list = top is MenuScreen && top.items.isNotEmpty;
     return WheelGuide(
-      menu: _stack.length > 1 ? '上の階層へ' : (widget.theta && services.player.hasQueue ? '再生中へ' : null),
+      menu: _stack.length > 1
+          ? '上の階層へ'
+          : !widget.theta
+              ? null
+              : !_railOpen && !services.settings.tabLabels
+                  ? 'タブを広げる'
+                  : services.player.hasQueue
+                      ? '再生中へ'
+                      : (_railOpen ? 'タブをたたむ' : null),
       menuHold: voice,
       center: list ? 'SELECT' : null,
       centerHold: list && top.items[top.selected].onLong != null ? fav : null,
@@ -240,8 +252,13 @@ class _IPodShellState extends State<IPodShell> implements Nav {
           _setFocusNow(false); // 再生中 → リストへ
         } else if (_stack.length > 1) {
           pop();
+        } else if (widget.theta && !_railOpen && !services.settings.tabLabels) {
+          setState(() => _railOpen = true); // いちばん上 → 左のタブを文字付きに広げる
         } else if (widget.theta && services.player.hasQueue) {
-          _setFocusNow(true); // リストのいちばん上 → 再生中へ（iPod の Now Playing と同じ）
+          _railOpen = false;
+          _setFocusNow(true); // もう一度 MENU → 再生中へ（iPod の Now Playing と同じ）
+        } else if (_railOpen) {
+          setState(() => _railOpen = false);
         }
       case WheelButton.select:
         if (_nowFocused) {
@@ -433,7 +450,11 @@ class _IPodShellState extends State<IPodShell> implements Nav {
                         onLongPress: _openQueue,
                       );
                   final now = nowPanel(false);
-                  if (c.maxWidth > c.maxHeight && c.maxWidth >= 600) {
+                  // 横並びにするか：Auto は幅 600 以上で、縦横がほぼ同じか横長（Fold の広げた画面・タブレットの横）
+                  final layout = services.settings.thetaLayout;
+                  final wide = layout == 'wide' ||
+                      (layout == 'auto' && c.maxWidth >= 600 && c.maxWidth >= c.maxHeight * 0.75);
+                  if (wide) {
                     // 横向き：左にリスト、右に再生中の曲とホイール
                     // 低い画面（横向きのスマホ）は曲の情報を小さい形に
                     final tall = c.maxHeight >= 520;
@@ -548,7 +569,12 @@ class _IPodShellState extends State<IPodShell> implements Nav {
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
       child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        ThetaTabs(active: _tab, onSelect: _selectTab),
+        ThetaTabs(
+          // いちばん上で広げているときは、リストで選んでいるモードを示す
+          active: _tab < 0 && _railOpen ? _modes.selected : _tab,
+          labels: services.settings.tabLabels || _railOpen,
+          onSelect: _selectTab,
+        ),
         Expanded(
           // リストを触ったら、ホイールのフォーカスもリストへ
           child: Listener(

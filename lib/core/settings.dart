@@ -31,6 +31,10 @@ class AppSettings extends ChangeNotifier {
   bool wheelGuide = true;
   /// アーティスト・アルバム・曲の一覧の先頭に、☆ お気に入りをまとめて出す
   bool favoritesFirst = true;
+  /// Theta：画面の並び。auto（幅で決める。Fold の広げた画面も横並び）/ wide（いつも横並び）/ tall（いつも縦並び）
+  String thetaLayout = 'auto';
+  /// Theta：左のタブに文字（ARTISTS など）も出す
+  bool tabLabels = false;
   bool blackBody = false;
   bool shuffle = false;
   RepeatSetting repeat = RepeatSetting.off;
@@ -69,6 +73,8 @@ class AppSettings extends ChangeNotifier {
     visualizer = _p.getString('visualizer') ?? 'off';
     wheelGuide = _p.getBool('wheelGuide') ?? true;
     favoritesFirst = _p.getBool('favoritesFirst') ?? true;
+    thetaLayout = _p.getString('thetaLayout') ?? 'auto';
+    tabLabels = _p.getBool('tabLabels') ?? false;
     dsFavRating = _p.getInt('dsFavRating') ?? 4;
     shelfFavorites = _p.getBool('shelfFavorites') ?? true;
     shelfRecent = _p.getBool('shelfRecent') ?? true;
@@ -121,6 +127,8 @@ class AppSettings extends ChangeNotifier {
     await _p.setString('visualizer', visualizer);
     await _p.setBool('wheelGuide', wheelGuide);
     await _p.setBool('favoritesFirst', favoritesFirst);
+    await _p.setString('thetaLayout', thetaLayout);
+    await _p.setBool('tabLabels', tabLabels);
     await _p.setInt('dsFavRating', dsFavRating);
     await _p.setBool('shelfFavorites', shelfFavorites);
     await _p.setBool('shelfRecent', shelfRecent);

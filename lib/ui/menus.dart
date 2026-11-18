@@ -382,6 +382,17 @@ MenuScreen settingsMenu() {
       if (s.skin == 'theta') ...[
         MenuItem('Theme', detail: skinLabels[s.hudTheme]?.split('（').first ?? 'System', chevron: true,
             onSelect: () => nav.push(themeMenu())),
+        MenuItem('Layout',
+            detail: switch (s.thetaLayout) { 'wide' => 'Wide', 'tall' => 'Tall', _ => 'Auto' }, onSelect: () {
+          // Auto（幅で決める）→ Wide（横並び）→ Tall（縦並び）
+          s.thetaLayout = switch (s.thetaLayout) { 'auto' => 'wide', 'wide' => 'tall', _ => 'auto' };
+          save();
+        }),
+        MenuItem('Tab Labels', detail: s.tabLabels ? 'On' : 'Off', onSelect: () {
+          // 左のタブに文字も出す（いちばん上で MENU を押しても一時的に広がる）
+          s.tabLabels = !s.tabLabels;
+          save();
+        }),
         MenuItem('Follow Home', detail: s.followSeriesSkin ? 'On' : 'Off', onSelect: () {
           // スキンを Theta Home Hatch（ui.skin）に合わせる
           s.followSeriesSkin = !s.followSeriesSkin;
