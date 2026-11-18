@@ -566,26 +566,44 @@ class _IPodShellState extends State<IPodShell> implements Nav {
         ),
       ]),
     );
+    // いちばん上の階層でタブを文字付きに広げたら、タブだけでモードを選ぶ（同じ一覧を 2 つ出さない）
+    final labels = services.settings.tabLabels || _railOpen;
+    final full = _tab < 0 && labels;
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        ThetaTabs(
-          // いちばん上で広げているときは、リストで選んでいるモードを示す
-          active: _tab < 0 && _railOpen ? _modes.selected : _tab,
-          labels: services.settings.tabLabels || _railOpen,
-          onSelect: _selectTab,
-        ),
-        Expanded(
-          // リストを触ったら、ホイールのフォーカスもリストへ
-          child: Listener(
-            onPointerDown: (_) => _setFocusNow(false),
-            child: CustomPaint(
-              foregroundPainter: p.rounded ? null : CornersPainter(_nowFocused ? p.line : p.accent),
-              child: _withToast(panel, p),
+      child: LayoutBuilder(
+        builder: (context, c) => Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          if (full)
+            Expanded(
+              child: _withToast(
+                ThetaTabs(
+                  active: _modes.selected, // ホイールで選んでいるモード
+                  width: c.maxWidth,
+                  onSelect: _selectTab,
+                  extra: [
+                    // モードの一覧のタブ以外の行（Shuffle Songs）
+                    for (final m in _modes.items.skip(thetaTabs.length))
+                      (m.label.toUpperCase(), Icons.shuffle_rounded, () => m.onSelect?.call()),
+                  ],
+                ),
+                p,
+              ),
+            )
+          else ...[
+            ThetaTabs(active: _tab, width: labels ? 116 : 40, onSelect: _selectTab),
+            Expanded(
+              // リストを触ったら、ホイールのフォーカスもリストへ
+              child: Listener(
+                onPointerDown: (_) => _setFocusNow(false),
+                child: CustomPaint(
+                  foregroundPainter: p.rounded ? null : CornersPainter(_nowFocused ? p.line : p.accent),
+                  child: _withToast(panel, p),
+                ),
+              ),
             ),
-          ),
-        ),
-      ]),
+          ],
+        ]),
+      ),
     );
   }
 

@@ -54,13 +54,18 @@ MenuScreen modeMenu(void Function(int) open) => MenuScreen(
     );
 
 /// リストの左に付く縦のタブ（ThetaHomeHatch の端のタブと同じ作り。低いときは印だけ）
+/// いちばん上の階層で広げたときは、タブだけで画面の左側いっぱいを使い、モードの一覧の代わりになる
 class ThetaTabs extends StatelessWidget {
   final int active;
   final void Function(int) onSelect;
 
-  /// 文字（ARTISTS など）も出す：横に広げて、印と文字を並べる
-  final bool labels;
-  const ThetaTabs({super.key, required this.active, required this.onSelect, this.labels = false});
+  /// 幅。40 は印だけ、90 以上で印と文字を横に並べる
+  final double width;
+
+  /// タブの下に足す行（いちばん上の階層で広げたときの Shuffle Songs など）。番号はタブの続き
+  final List<(String, IconData, VoidCallback)> extra;
+  const ThetaTabs(
+      {super.key, required this.active, required this.onSelect, this.width = 40, this.extra = const []});
 
   @override
   Widget build(BuildContext context) {
@@ -68,12 +73,16 @@ class ThetaTabs extends StatelessWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOut,
-      width: labels ? 116 : 40,
+      width: width,
       child: Column(
         children: [
           for (var i = 0; i < thetaTabs.length; i++) ...[
             if (i > 0) SizedBox(height: thetaTabs[i].group != thetaTabs[i - 1].group ? 10 : 4),
             Expanded(child: _tab(p, i)),
+          ],
+          for (var j = 0; j < extra.length; j++) ...[
+            const SizedBox(height: 10),
+            Expanded(child: _row(p, thetaTabs.length + j, extra[j].$1, extra[j].$2, extra[j].$3, 0)),
           ],
         ],
       ),
@@ -82,6 +91,11 @@ class ThetaTabs extends StatelessWidget {
 
   Widget _tab(Palette p, int i) {
     final t = thetaTabs[i];
+    return _row(p, i, t.label, t.icon, () => onSelect(i), t.group);
+  }
+
+  Widget _row(Palette p, int i, String label, IconData icon, VoidCallback onTap, int group) {
+    final t = (label: label, icon: icon, group: group);
     final on = i == active;
     final g = p.group(t.group);
     final bg = on ? (p.pop ? g : p.accent) : (p.pop ? p.panel : p.bg);
@@ -92,7 +106,7 @@ class ThetaTabs extends StatelessWidget {
       selected: on,
       label: t.label,
       child: GestureDetector(
-        onTap: () => onSelect(i),
+        onTap: onTap,
         child: Container(
           decoration: BoxDecoration(
             color: bg,
@@ -109,17 +123,21 @@ class ThetaTabs extends StatelessWidget {
                 builder: (context, c) => Center(
                   child: c.maxWidth >= 90
                       ? Padding(
-                          padding: const EdgeInsets.only(left: 8, right: 8),
+                          padding: EdgeInsets.only(left: c.maxWidth >= 200 ? 16 : 8, right: 8),
                           child: Row(children: [
-                            Icon(t.icon, size: 18, color: fg),
-                            const SizedBox(width: 6),
+                            Icon(t.icon, size: c.maxWidth >= 200 ? 22 : 18, color: fg),
+                            SizedBox(width: c.maxWidth >= 200 ? 12 : 6),
                             Expanded(
                               child: FittedBox(
                                 fit: BoxFit.scaleDown,
                                 alignment: Alignment.centerLeft,
                                 child: Text(t.label,
                                     maxLines: 1,
-                                    style: TextStyle(fontSize: 12, letterSpacing: 1.2, fontFamily: p.mono, color: fg)),
+                                    style: TextStyle(
+                                        fontSize: c.maxWidth >= 200 ? 16 : 12,
+                                        letterSpacing: 1.2,
+                                        fontFamily: p.mono,
+                                        color: fg)),
                               ),
                             ),
                           ]),

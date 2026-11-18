@@ -64,7 +64,7 @@ Tailscale 経由で NAS の音楽を再生する Android 音楽プレーヤー�
 | スキン | 内容 |
 |---|---|
 | iPod | 上に液晶、下にクリックホイール。Settings → Skin で切り替え |
-| Theta | iPod と同じ操作（リスト・クリックホイール・MENU で戻る）を、シリーズのスキン（HUD）の見た目で。横向き（タブレット・Fold の広げた画面）は左にタブ付きのリスト、右に再生中の曲とホイール（設定 → Layout で Auto・Wide・Tall）。左のタブは設定 → Tab Labels で文字付きに。縦向きは上にリスト、下に再生中の曲とホイール。テーマはシリーズのスキン 11 種（SYSTEM・DARK・LIGHT・POP・ALERT・SCI-FI・TERMINAL・BRAUN・SOFT・WINDOW・LCD。配色は Theta.Hatch.Series の `skins.json`）。既定は Theta Home Hatch のスキンに合わせる。設定 → Skin・Theme で切り替え |
+| Theta | iPod と同じ操作（リスト・クリックホイール・MENU で戻る）を、シリーズのスキン（HUD）の見た目で。横向き（タブレット・Fold の広げた画面）は左にタブ付きのリスト、右に再生中の曲とホイール（設定 → Layout で Auto・Wide・Tall）。左のタブは設定 → Tab Labels で文字付きに（いちばん上の階層ではタブが左側いっぱいに広がり、モードの一覧の代わりになる）。縦向きは上にリスト、下に再生中の曲とホイール。テーマはシリーズのスキン 11 種（SYSTEM・DARK・LIGHT・POP・ALERT・SCI-FI・TERMINAL・BRAUN・SOFT・WINDOW・LCD。配色は Theta.Hatch.Series の `skins.json`）。既定は Theta Home Hatch のスキンに合わせる。設定 → Skin・Theme で切り替え |
 
 Theta スキンの書体 Oswald・Share Tech Mono は SIL Open Font License（`docs/licenses`）。
 
@@ -74,7 +74,7 @@ Theta スキンの書体 Oswald・Share Tech Mono は SIL Open Font License（`d
 |---|---|
 | リングをなぞる | スクロール（Now Playing、Theta では再生中のパネルにフォーカスがあるときは音量） |
 | 中央ボタン | 決定（Now Playing・再生中のパネルではシークに切り替え）。長押しでお気に入り |
-| MENU | 戻る（Android の戻るボタンでも可）。Theta では再生中 → リスト、モードのいちばん上 → モードの一覧（☆ Favorites が先頭）→ 左のタブを文字付きに広げる → 再生中。長押しで音声検索 |
+| MENU | 戻る（Android の戻るボタンでも可）。Theta では再生中 → リスト、モードのいちばん上 → モードの一覧（☆ Favorites が先頭）→ 左のタブを文字付きに広げる（いちばん上ではタブだけでモードを選ぶ）→ 再生中。長押しで音声検索 |
 | （設定） | Clicker：カリカリ音、Haptics：振動を、それぞれオン・オフ |
 | ▶❚❚ | 再生/一時停止 |
 | ◀◀ / ▶▶ | 前/次の曲、長押しで巻き戻し/早送り |
