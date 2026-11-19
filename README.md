@@ -98,9 +98,9 @@ Theta スキンの書体 Oswald・Share Tech Mono は SIL Open Font License（`d
 2026-11-19 に決めた方針（正本は Theta.Hatch.Series の `spec/THETA_LIBRARY_SPEC.md` §4.1）。
 
 - ミュージックビデオ（PV・MV、ライブ映像の 1 曲分、YouTube の MV）は NAS の **`music` に置き、このアプリで視聴・管理する**。Theta Movie Hatch・8Tube では扱わない
-- そのために**このアプリの版上げ（動画の再生）が必要**。曲・アーティストとの結び付け方も含めて、このリポジトリのスレッドで決める
-- 置き場所・名前の形・タグの決まりは、このリポジトリのスレッドで「MV も含めた音楽データの整理方針」としてまとめ、Theta.Hatch.Series の §4.1 に書く
-- 今は仮置き：`music/_ミュージックビデオ/`（8Tube の `▶ミュージックビデオ` と `▶YouTube/Music` から移した物）
+- 置き場所：`music/▶ミュージックビデオ/<アーティスト>/<アーティスト> - <曲名> (<年>).mp4`＋`.nfo`（Kodi・Jellyfin の musicvideo 形式）＋`-thumb.jpg`。アーティストの表記は曲のアルバムアーティストのフォルダと同じにし、アーティスト名と曲名で曲と結び付ける
+- 1.7.2 では曲として読まないだけ。**動画の再生・曲との結び付けは後の版**
+- 仮置きの `music/_ミュージックビデオ/`（8Tube から移した物）は、`docs/PROMPT_MUSIC_ORGANIZE.md` でローカルの Claude に整理してもらう
 
 ## シリーズとの連携
 
