@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:theta_music/core/favorites.dart';
 import 'package:theta_music/core/library.dart';
 import 'package:theta_music/core/models.dart';
+import 'package:theta_music/core/scanner.dart';
 import 'package:theta_music/core/search.dart';
 
 Track t(String artist, String album, String title, int no) =>
@@ -90,5 +91,21 @@ void main() {
     final a = l.artists.single;
     expect(a.albumTracks.length, 3);
     expect([for (final t in a.tracks) t.title], ['Ride on Time', 'デュエット']);
+  });
+
+  test('shelves: only ▶ folders are read when there are any; _ folders and music videos never', () {
+    const mv = '/music/▶ミュージックビデオ/山下達郎/山下達郎 - RIDE ON TIME (1980).mp4';
+    const song = '/music/▶邦楽/山下達郎/RIDE ON TIME (1980)/01 RIDE ON TIME.flac';
+    const loose = '/music/ダウンロード/a.mp3';
+    expect(usesShelves([song, loose]), isTrue);
+    expect(usesShelves([loose]), isFalse);
+    expect(isLibraryPath(song, shelves: true), isTrue);
+    expect(isLibraryPath(loose, shelves: true), isFalse); // 棚の外
+    expect(isLibraryPath(loose), isTrue); // 棚が無ければ全部読む（整理前）
+    expect(isLibraryPath(mv, shelves: true), isFalse);
+    expect(isLibraryPath(mv), isFalse);
+    expect(isLibraryPath('/music/_未整理/a.mp3'), isFalse);
+    expect(isLibraryPath('/music/▶邦楽/_未整理/a.mp3', shelves: true), isFalse);
+    expect(isLibraryPath('/music/_a.mp3'), isTrue); // ファイル名は見ない
   });
 }

@@ -9,6 +9,36 @@ import 'settings.dart';
 import 'tags.dart';
 import 'webdav.dart';
 
+/// 棚の目印。`▶` で始まるフォルダ＝棚（Theta Movie Hatch と同じ。Theta.Hatch.Series の THETA_LIBRARY_SPEC.md §4）。
+/// 棚が 1 つでもあれば、棚の中の曲だけを読む。棚が無ければ（整理前）全部読む
+const shelfMark = '▶';
+
+/// ミュージックビデオの棚（曲としては読まない。§4.1）
+const mvShelf = '▶ミュージックビデオ';
+
+bool isShelf(String name) => name.startsWith(shelfMark);
+
+/// 曲として読まないフォルダ：`_` で始まる物（`_整理の記録`・`_未整理`・`_プレイリスト`）、隠しフォルダ、
+/// Synology の `@eaDir`・`#recycle`、ミュージックビデオの棚
+bool skipDir(String name) =>
+    name.startsWith('_') || name.startsWith('.') || name.startsWith('@') || name == '#recycle' || name == mvShelf;
+
+List<String> _dirsOf(String path) {
+  final parts = path.split('/').where((s) => s.isNotEmpty).toList();
+  if (parts.isNotEmpty) parts.removeLast(); // ファイル名
+  return parts;
+}
+
+/// 棚（▶）を使っているか
+bool usesShelves(Iterable<String> paths) => paths.any((p) => _dirsOf(p).any(isShelf));
+
+/// 曲として読むか。shelves：棚を使っているなら、棚の中の物だけ
+bool isLibraryPath(String path, {bool shelves = false}) {
+  final dirs = _dirsOf(path);
+  if (dirs.any(skipDir)) return false;
+  return !shelves || dirs.any(isShelf);
+}
+
 const audioExts = {'mp3', 'flac', 'm4a', 'mp4', 'aac', 'alac', 'ogg', 'opus', 'oga', 'wav', 'aiff', 'aif', 'wma'};
 const _imageExts = {'jpg', 'jpeg', 'png', 'webp'};
 const _preferredArt = ['cover', 'folder', 'front', 'album', 'albumart', 'albumartsmall'];
@@ -85,6 +115,9 @@ class Scanner extends ChangeNotifier {
           for (final e in entries) {
             if (e.name.startsWith('.') || e.name.startsWith('@') || e.name == '#recycle') continue;
             if (e.isDir) {
+              if (skipDir(e.name)) continue; // `_未整理`・`▶ミュージックビデオ` などは曲として読まない
+              // いちばん上に棚（▶）があれば、棚でないフォルダには入らない
+              if (d == root && !isShelf(e.name) && entries.any((x) => x.isDir && isShelf(x.name))) continue;
               next.add(e.path);
             } else {
               final ext = extOf(e.name);
@@ -104,6 +137,9 @@ class Scanner extends ChangeNotifier {
         pending = next;
       }
       if (_cancel) throw _Cancelled();
+      // 棚（▶）を使っているなら、棚の中の曲だけ（Music のフォルダを NAS の上の方にしたときも）
+      final shelves = usesShelves([for (final e in audio) e.path]);
+      audio.removeWhere((e) => !isLibraryPath(e.path, shelves: shelves));
 
       // 2) 差分判定
       final old = {for (final t in library.tracks) t.path: t};
@@ -177,6 +213,7 @@ class Scanner extends ChangeNotifier {
       );
       if (_cancel) throw _Cancelled();
       final root = commonRoot([for (final s in songs) s.path]);
+      final shelves = usesShelves([for (final s in songs) s.path]);
       final tracks = <Track>[];
       for (final s in songs) {
         // タグが空の項目は WebDAV のときと同じくフォルダ構成から補う
@@ -190,6 +227,7 @@ class Scanner extends ChangeNotifier {
           ..trackNo = s.track
           ..discNo = s.disc;
         final path = s.path.isEmpty ? '/${s.id}' : s.path;
+        if (!isLibraryPath(path, shelves: shelves)) continue; // 棚の外・`_未整理`・ミュージックビデオ
         final t = _makeTrack(DavEntry(path, false, s.size, 0), root == '/' ? '' : root, tag);
         tracks.add(Track.fromJson({...t.toJson(), 'ap': 'ds:${s.id}', 'i': s.id, 'r': s.rating}));
       }
@@ -271,7 +309,8 @@ class Scanner extends ChangeNotifier {
       dirs = dirs.sublist(0, dirs.length - 1);
     }
     final pathAlbum = dirs.isNotEmpty ? dirs.last : '';
-    final pathArtist = dirs.length >= 2 ? dirs[dirs.length - 2] : '';
+    var pathArtist = dirs.length >= 2 ? dirs[dirs.length - 2] : '';
+    if (isShelf(pathArtist)) pathArtist = ''; // 棚の直下のアルバム
     var stem = file.contains('.') ? file.substring(0, file.lastIndexOf('.')) : file;
     var no = 0;
     final m = _numPrefix.firstMatch(stem);

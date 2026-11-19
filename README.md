@@ -23,6 +23,7 @@ Tailscale 経由で NAS の音楽を再生する Android 音楽プレーヤー�
   - フォルダを PROPFIND で巡回し、各ファイルのタグ部分だけ Range 取得して読む（ファイル全体はダウンロードしない）
   - 対応タグ: MP3 (ID3v1/v2.2–2.4, Shift_JIS 自動判定), FLAC (Vorbis Comment), M4A/AAC (iTunes タグ)
   - タグが無い場合はフォルダ構成 `Artist/Album/01 Title.ext`（`Disc 1/` 等も考慮）から推測
+  - **棚**：Music のフォルダ直下に `▶` で始まるフォルダ（`▶邦楽` など）があれば、その中だけを読む（Theta Movie Hatch と同じ。棚が無ければ全部）。`_` で始まるフォルダと `▶ミュージックビデオ` は曲として読まない（Theta.Hatch.Series の `spec/THETA_LIBRARY_SPEC.md` §4・§4.1）
   - アート: 埋め込み画像（Range 取得）か `cover.jpg` / `folder.jpg` 等
   - 2 回目以降は**差分スキャン**（サイズ・更新日時が変わったファイルだけ読み直し）
 - **Obsidian 連携**: Library → Export to Obsidian で、NAS 上の Vault フォルダに Markdown を書き出し
