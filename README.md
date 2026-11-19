@@ -93,6 +93,15 @@ Theta スキンの書体 Oswald・Share Tech Mono は SIL Open Font License（`d
    - 「接続テスト」で OK を確認
 4. ライブラリを更新（iPod: Library → Update Library / Theta: LIBRARY → UPDATE）
 
+## ミュージックビデオ（予定）
+
+2026-11-19 に決めた方針（正本は Theta.Hatch.Series の `spec/THETA_LIBRARY_SPEC.md` §4.1）。
+
+- ミュージックビデオ（PV・MV、ライブ映像の 1 曲分、YouTube の MV）は NAS の **`music` に置き、このアプリで視聴・管理する**。Theta Movie Hatch・8Tube では扱わない
+- そのために**このアプリの版上げ（動画の再生）が必要**。曲・アーティストとの結び付け方も含めて、このリポジトリのスレッドで決める
+- 置き場所・名前の形・タグの決まりは、このリポジトリのスレッドで「MV も含めた音楽データの整理方針」としてまとめ、Theta.Hatch.Series の §4.1 に書く
+- 今は仮置き：`music/_ミュージックビデオ/`（8Tube の `▶ミュージックビデオ` と `▶YouTube/Music` から移した物）
+
 ## シリーズとの連携
 
 - **ダウンロード・更新**：[Releases](https://github.com/kiwiman0706-beep/Theta.Music.Hatch/releases/latest)（`ThetaMusicHatch-<版>.apk`）。更新は Theta Home Hatch（または KidsHome）に頼む（設定の「更新する」。ハブが無ければ Releases を開く）。このアプリはインストールの権限を持たない
