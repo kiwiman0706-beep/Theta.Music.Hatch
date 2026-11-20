@@ -47,7 +47,7 @@ class ArtCache {
         data = await ds.cover(ref.path.substring(3));
         if (data != null) await f.writeAsBytes(data);
       } else {
-        final dav = settings.client();
+        final dav = musicStore(settings, ds);
         try {
           if (ref.embedded) {
             if (ref.length > 8 * 1024 * 1024) return null;

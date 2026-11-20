@@ -65,7 +65,7 @@ class Services {
       player,
       // DS audio のときは File Station、WebDAV のときは WebDAV で Vault に書く
       ObsidianExporter(settings, library,
-          () => settings.source == MusicSource.dsaudio ? ds : settings.client(),
+          () => settings.source == MusicSource.webdav ? settings.client() : ds,
           favorites: favorites),
       favorites,
       recents,

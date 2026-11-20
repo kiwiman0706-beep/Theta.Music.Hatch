@@ -6,8 +6,9 @@ import 'webdav.dart';
 
 enum RepeatSetting { off, one, all }
 
-/// 曲の取得元。webdav: NAS のフォルダを直接スキャン / dsaudio: Synology Audio Station の API
-enum MusicSource { webdav, dsaudio }
+/// 曲の取得元。webdav: NAS のフォルダを WebDAV でスキャン / dsaudio: Synology Audio Station の API /
+/// filestation: NAS のフォルダを DSM の File Station でスキャン（Movie・Book と同じ。WebDAV Server 不要）
+enum MusicSource { webdav, dsaudio, filestation }
 
 class AppSettings extends ChangeNotifier {
   late SharedPreferences _p;
@@ -81,7 +82,7 @@ class AppSettings extends ChangeNotifier {
     blackBody = _p.getBool('blackBody') ?? false;
     shuffle = _p.getBool('shuffle') ?? false;
     repeat = RepeatSetting.values[(_p.getInt('repeat') ?? 0).clamp(0, 2)];
-    source = MusicSource.values[(_p.getInt('source') ?? 0).clamp(0, 1)];
+    source = MusicSource.values[(_p.getInt('source') ?? 0).clamp(0, 2)];
     dsUrl = _p.getString('dsUrl') ?? '';
     dsDid = _p.getString('dsDid') ?? '';
     dsTranscode = _p.getBool('dsTranscode') ?? false;
@@ -111,7 +112,7 @@ class AppSettings extends ChangeNotifier {
     }
   }
 
-  bool get configured => source == MusicSource.dsaudio ? dsUrl.isNotEmpty : serverUrl.isNotEmpty;
+  bool get configured => source == MusicSource.webdav ? serverUrl.isNotEmpty : dsUrl.isNotEmpty;
 
   WebDavClient client() => WebDavClient(serverUrl, user, password);
 

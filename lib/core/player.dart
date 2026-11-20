@@ -68,10 +68,10 @@ class Player extends ChangeNotifier {
       uri = await ds.streamUri(t.id, ext);
       headers = const {};
     } else {
-      final dav = settings.client();
-      uri = dav.uriFor(t.path);
-      headers = dav.authHeaders;
-      dav.close();
+      // WebDAV か File Station
+      final store = musicStore(settings, ds);
+      (uri, headers) = await store.stream(t.path);
+      store.close();
     }
     return AudioSource.uri(uri,
         headers: headers,

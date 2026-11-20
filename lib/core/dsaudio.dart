@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 
 import 'note_store.dart';
 import 'settings.dart';
+import 'webdav.dart';
 
 class DsException implements Exception {
   final String message;
@@ -123,7 +124,8 @@ class DsAudioClient implements NoteStore {
       'method': 'login',
       'account': settings.user,
       'passwd': settings.password,
-      'session': 'AudioStation',
+      // File Station で曲を読むときは File Station のセッション（Movie・Book と同じ）
+      'session': settings.source == MusicSource.filestation ? 'FileStation' : 'AudioStation',
       'format': 'sid',
     };
     if (_otp != null) {
@@ -148,7 +150,9 @@ class DsAudioClient implements NoteStore {
           switch (code) {
             400 => 'アカウントかパスワードが違います',
             401 => 'アカウントが無効です',
-            402 => 'Audio Station を使う権限がありません',
+            402 => settings.source == MusicSource.filestation
+                ? 'File Station を使う権限がありません'
+                : 'Audio Station を使う権限がありません',
             407 => 'ログインの失敗が続いたため、NAS が一時的に拒否しています',
             _ => 'ログインエラー $code',
           },
@@ -270,6 +274,101 @@ class DsAudioClient implements NoteStore {
 
   // ------------------------------------------------ File Station（Obsidian 書き出し用）
 
+  // ------------------------------------------------ File Station で曲を読む（接続方式 File Station）
+
+  /// フォルダ直下の一覧（WebDAV の PROPFIND と同じ形）。パスは共有フォルダから（`/music/…`）
+  Future<List<DavEntry>> fsList(String dir) async {
+    final out = <DavEntry>[];
+    var offset = 0;
+    while (true) {
+      final r = await call('SYNO.FileStation.List', 'list', {
+        'folder_path': dir,
+        'offset': '$offset',
+        'limit': '1000',
+        'additional': jsonEncode(['size', 'time']),
+      });
+      final files = ((r['files'] as List?) ?? const []).cast<Map>();
+      for (final f in files) {
+        final add = (f['additional'] as Map?) ?? const {};
+        final time = (add['time'] as Map?) ?? const {};
+        out.add(DavEntry(
+          '${f['path'] ?? '$dir/${f['name']}'}',
+          f['isdir'] == true,
+          (add['size'] as num?)?.toInt() ?? 0,
+          ((time['mtime'] as num?)?.toInt() ?? 0) * 1000,
+        ));
+      }
+      offset += files.length;
+      final total = (r['total'] as num?)?.toInt() ?? offset;
+      if (files.isEmpty || offset >= total) break;
+    }
+    return out;
+  }
+
+  /// ファイルを取り寄せる URL（セッション ID を含む。再生にも使う）
+  Future<Uri> fsUri(String path) async {
+    await ensureLogin();
+    const api = 'SYNO.FileStation.Download';
+    return Uri.parse(_url(api)).replace(queryParameters: {
+      'api': api,
+      'version': '${_ver(api, 2)}',
+      'method': 'download',
+      'path': jsonEncode([path]),
+      'mode': 'open',
+      '_sid': _sid!,
+    });
+  }
+
+  /// ファイルを GET。エラー（JSON が返る）ならセッションを取り直して 1 回だけやり直す
+  Future<http.StreamedResponse> _fsGet(String path, Map<String, String> headers) async {
+    for (var attempt = 0;; attempt++) {
+      final req = http.Request('GET', await fsUri(path))..headers.addAll(headers);
+      final res = await _c.send(req).timeout(const Duration(seconds: 30));
+      final type = res.headers['content-type'] ?? '';
+      if (!type.startsWith('application/json')) {
+        if (res.statusCode == 200 || res.statusCode == 206) return res;
+        await res.stream.drain<void>().catchError((_) {});
+        throw DsException('File Station HTTP ${res.statusCode}: $path');
+      }
+      final r = jsonDecode(utf8.decode(await res.stream.toBytes())) as Map<String, dynamic>;
+      final code = (r['error'] as Map?)?['code'] as int? ?? 0;
+      if (attempt == 0 && (code == 105 || code == 106 || code == 107 || code == 119)) {
+        _sid = null;
+        continue;
+      }
+      throw DsException('File Station エラー $code: $path', code);
+    }
+  }
+
+  /// バイト範囲（タグ・埋め込みジャケットを読む）。Range に応えない（200）ときも必要分だけ読んで切る
+  Future<Uint8List> fsRange(String path, int offset, int length) async {
+    final res = await _fsGet(path, {'Range': 'bytes=$offset-${offset + length - 1}'});
+    final skip = res.statusCode == 200 ? offset : 0;
+    final b = BytesBuilder(copy: false);
+    var seen = 0;
+    final sub = StreamIterator(res.stream.timeout(const Duration(seconds: 30)));
+    try {
+      while (b.length < length && await sub.moveNext()) {
+        var c = sub.current;
+        if (seen < skip) {
+          final need = skip - seen;
+          seen += c.length;
+          if (c.length <= need) continue;
+          c = c.sublist(need);
+        } else {
+          seen += c.length;
+        }
+        b.add(c);
+      }
+    } finally {
+      await sub.cancel();
+    }
+    final bytes = b.takeBytes();
+    return bytes.length > length ? Uint8List.sublistView(bytes, 0, length) : bytes;
+  }
+
+  Future<Uint8List> fsBytes(String path) async => (await _fsGet(path, const {})).stream.toBytes();
+
   /// フォルダの中のファイル名（整理の記録を探す）
   Future<List<String>> listNames(String dir) async {
     final r = await call('SYNO.FileStation.List', 'list', {'folder_path': dir, 'limit': '1000'});
@@ -347,3 +446,31 @@ class DsAudioClient implements NoteStore {
   @override
   void close() {}
 }
+
+/// File Station で曲を読む（接続方式 File Station）。スキャン・ジャケット・再生は WebDAV と同じ流れで、
+/// 取り寄せ方だけが違う。ログイン（2 段階認証・デバイストークン）は DS audio と同じ
+class FileStationStore implements FileStore {
+  final DsAudioClient ds;
+  FileStationStore(this.ds);
+
+  @override
+  Future<List<DavEntry>> list(String dirPath) => ds.fsList(dirPath);
+  @override
+  Future<Uint8List> readRange(String path, int offset, int length) => ds.fsRange(path, offset, length);
+  @override
+  Future<Uint8List> getBytes(String path) => ds.fsBytes(path);
+  @override
+  Future<(Uri, Map<String, String>)> stream(String path) async => (await ds.fsUri(path), const <String, String>{});
+  @override
+  Future<String?> getText(String path) => ds.getText(path);
+  @override
+  Future<void> putText(String path, String text) => ds.putText(path, text);
+  @override
+  Future<void> mkdirs(String path) => ds.mkdirs(path);
+  @override
+  void close() {}
+}
+
+/// 曲を読む先（WebDAV か File Station）。DS audio のときは使わない
+FileStore musicStore(AppSettings s, DsAudioClient ds) =>
+    s.source == MusicSource.filestation ? FileStationStore(ds) : s.client();

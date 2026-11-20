@@ -372,7 +372,9 @@ MenuScreen settingsMenu() {
   return MenuScreen(
     'Settings',
     () => [
-      MenuItem('Source', detail: s.source == MusicSource.dsaudio ? 'DS audio' : 'WebDAV', chevron: true,
+      MenuItem('Source',
+          detail: switch (s.source) { MusicSource.dsaudio => 'DS audio', MusicSource.filestation => 'File Station', _ => 'WebDAV' },
+          chevron: true,
           onSelect: () => showServerDialog(nav.context)),
       MenuItem('Skin', detail: s.skin == 'theta' ? 'Theta' : 'iPod', onSelect: () {
         // iPod ⇄ Theta（シリーズのスキン。操作は同じ）

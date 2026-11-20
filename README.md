@@ -16,6 +16,9 @@ Tailscale 経由で NAS の音楽を再生する Android 音楽プレーヤー�
   - **DS audio**: Synology Audio Station の Web API（DS audio と同じ `SYNO.AudioStation.*`）で曲の一覧・再生・カバーを取得。
     スキャン不要で、タグは NAS 側のもの。ログインは ThetaHomeHatch と同じ手順（`SYNO.API.Info` → `SYNO.API.Auth`、
     2 段階認証は初回だけコード入力 → デバイストークンで次から不要）。必要なら MP3 に変換して受け取れます
+  - **File Station**: DSM の File Station API（`SYNO.FileStation.List`・`Download`）で NAS のフォルダを直接スキャン・再生（Theta Movie Hatch・Book Hatch と同じ）。
+    WebDAV Server も Audio Station も要らず、ログインは DS audio と同じ（2 段階認証・デバイストークン、Home から NAS の設定を受け取れる）。
+    スキャン・タグ・ジャケットの読み方は WebDAV と同じ（タグは Range で頭と最後だけ取り寄せる）
   - Tailscale がトンネルを暗号化するので HTTP でも通信内容は保護されます
 - **再生**: just_audio (ExoPlayer) で NAS から直接ストリーミング。バックグラウンド再生・ロック画面操作対応。
   通信が切れた場合は同じ位置から最大 3 回自動で再接続。
@@ -134,6 +137,8 @@ DAV_URL=http://127.0.0.1:8765 DAV_USER=u DAV_PASS=p flutter test test/dav_integr
 python3 test/fake_dsm.py <音楽フォルダ> <書き出し先フォルダ> 5000 --otp &
 DS_URL=127.0.0.1:5000 DS_USER=u DS_PASS=p DS_VAULT=/vault/Music DS_OTP=123456 \
   flutter test test/ds_integration_test.dart
+# File Station（同じテストサーバー。DS_MUSIC は曲のある共有フォルダ、既定 /music）
+DS_URL=127.0.0.1:5000 DS_USER=u DS_PASS=p flutter test test/fs_integration_test.dart
 ```
 
 `fake_dsm.py` は応答の形を DSM に合わせたものなので、実機の Audio Station と細部が違う可能性があります。

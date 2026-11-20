@@ -122,7 +122,7 @@ class Scanner extends ChangeNotifier {
     status = 'フォルダを探索中…';
     notifyListeners();
     if (settings.source == MusicSource.dsaudio) return _scanDs();
-    final dav = settings.client();
+    final dav = musicStore(settings, ds); // WebDAV か File Station
     try {
       final root = _normRoot(settings.musicPath);
       final audio = <DavEntry>[];

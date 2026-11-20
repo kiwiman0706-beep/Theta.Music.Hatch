@@ -24,8 +24,19 @@ class DavException implements Exception {
   String toString() => message;
 }
 
+/// 曲を読む先（WebDAV・File Station）。スキャン・タグ・ジャケット・再生で使う
+abstract class FileStore implements NoteStore {
+  /// フォルダ直下（自分自身は除く）
+  Future<List<DavEntry>> list(String dirPath);
+  Future<Uint8List> readRange(String path, int offset, int length);
+  Future<Uint8List> getBytes(String path);
+
+  /// 再生用の URL と、付けるヘッダー
+  Future<(Uri, Map<String, String>)> stream(String path);
+}
+
 /// 最小限の WebDAV クライアント（Synology の WebDAV Server パッケージ想定）。
-class WebDavClient implements NoteStore {
+class WebDavClient implements FileStore {
   final Uri base; // 例: http://nas.tailxxxx.ts.net:5005
   final String user;
   final String password;
@@ -57,7 +68,11 @@ class WebDavClient implements NoteStore {
       '<d:resourcetype/><d:getcontentlength/><d:getlastmodified/>'
       '</d:prop></d:propfind>';
 
+  @override
+  Future<(Uri, Map<String, String>)> stream(String path) async => (uriFor(path), authHeaders);
+
   /// フォルダ直下を一覧（Depth: 1）。自分自身は除く。
+  @override
   Future<List<DavEntry>> list(String dirPath) async {
     final req = http.Request('PROPFIND', uriFor(dirPath.endsWith('/') ? dirPath : '$dirPath/'))
       ..headers.addAll(authHeaders)
@@ -119,6 +134,7 @@ class WebDavClient implements NoteStore {
   }
 
   /// バイト範囲を取得。サーバーが Range 非対応(200)でも必要分だけ読んで切断する。
+  @override
   Future<Uint8List> readRange(String path, int offset, int length) async {
     final req = http.Request('GET', uriFor(path))
       ..headers.addAll(authHeaders)
@@ -148,6 +164,7 @@ class WebDavClient implements NoteStore {
     return bytes.length > length ? Uint8List.sublistView(bytes, 0, length) : bytes;
   }
 
+  @override
   Future<Uint8List> getBytes(String path) async {
     final res = await _client.get(uriFor(path), headers: authHeaders).timeout(const Duration(seconds: 60));
     if (res.statusCode != 200) throw DavException('GET 失敗 (${res.statusCode})');

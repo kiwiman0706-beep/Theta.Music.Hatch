@@ -181,13 +181,33 @@ class H(BaseHTTPRequestHandler):
             d = vault_path(q['folder_path'])
             if not os.path.isdir(d):
                 return self.err(408)
-            return self.ok({'files': [{'name': n, 'path': q['folder_path'] + '/' + n,
-                                       'isdir': os.path.isdir(os.path.join(d, n))} for n in sorted(os.listdir(d))]})
+            names = sorted(os.listdir(d))
+            off, lim = int(q.get('offset', 0)), int(q.get('limit', 1000))
+            files = []
+            for n in names[off:off + lim]:
+                full = os.path.join(d, n)
+                st = os.stat(full)
+                files.append({'name': n, 'path': q['folder_path'].rstrip('/') + '/' + n, 'isdir': os.path.isdir(full),
+                              'additional': {'size': st.st_size, 'time': {'mtime': int(st.st_mtime)}}})
+            return self.ok({'files': files, 'total': len(names), 'offset': off})
         if api == 'SYNO.FileStation.Download':
             p = vault_path(json.loads(q['path'])[0])
             if not os.path.exists(p):
                 return self.err(408)
             data = open(p, 'rb').read()
+            rng = self.headers.get('Range')
+            if rng and rng.startswith('bytes='):
+                a, _, b = rng[6:].partition('-')
+                a = int(a)
+                b = min(int(b) if b else len(data) - 1, len(data) - 1)
+                part = data[a:b + 1]
+                self.send_response(206)
+                self.send_header('Content-Type', 'application/octet-stream')
+                self.send_header('Content-Range', 'bytes %d-%d/%d' % (a, b, len(data)))
+                self.send_header('Content-Length', str(len(part)))
+                self.end_headers()
+                self.wfile.write(part)
+                return
             self.send_response(200)
             self.send_header('Content-Type', 'application/octet-stream')
             self.send_header('Content-Length', str(len(data)))

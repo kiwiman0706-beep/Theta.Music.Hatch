@@ -20,6 +20,7 @@
 - 「更新する」でハブの更新画面が開く／ハブが無ければ Releases が開く
 - Fold の広げた画面で横並びになる・モードの一覧で MENU を押すと左のタブが文字付きに広がる
 - 実際の NAS で棚（`▶`）：棚の外・`_` のフォルダ・`▶ミュージックビデオ` の動画が曲に入らない（WebDAV は wsgidav で確認済み。DS audio の Audio Station のパスでは未確認）
+- File Station（接続方式）：本物の DSM 7 で、一覧・タグ・ジャケット・再生、**シーク（`SYNO.FileStation.Download` の `mode=open` が Range に応えるか）**、セッション `FileStation` でのログイン・2 段階認証（テスト用 DSM では確認済み）
 - 整理の記録：実際の NAS で曲を動かして記録を書き、スキャンで曲のお気に入りが付け替わる（WebDAV・テスト用 DSM では確認済み。実機の File Station の List と、Audio Station のパスの形は未確認）
 - Theta Home の棚：お気に入り・最近再生のジャケットが並び、押すと再生する
 - パスワード・デバイストークンの暗号化保存（前の版の平文からの移し替え）

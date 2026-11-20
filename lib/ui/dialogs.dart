@@ -7,7 +7,7 @@ import '../core/series.dart';
 import '../core/settings.dart';
 import '../core/webdav.dart';
 
-/// 接続先の設定。WebDAV（フォルダを直接スキャン）か DS audio（Audio Station の API）
+/// 接続先の設定。WebDAV（フォルダを直接スキャン）・DS audio（Audio Station の API）・File Station（DSM でフォルダをスキャン）
 Future<void> showServerDialog(BuildContext context) {
   final s = services.settings;
   var source = s.source;
@@ -28,6 +28,7 @@ Future<void> showServerDialog(BuildContext context) {
     builder: (context) => StatefulBuilder(builder: (context, setState) {
       Future<void> apply() async {
         final changed = s.dsUrl != dsUrl.text.trim() || s.user != user.text.trim() || s.password != pass.text;
+        if (s.source != source) services.ds.reset(); // セッションの種類（Audio Station・File Station）が変わる
         s.source = source;
         s.serverUrl = url.text.trim() == 'http://' ? '' : url.text.trim();
         s.dsUrl = dsUrl.text.trim() == 'http://' ? '' : dsUrl.text.trim();
@@ -57,6 +58,12 @@ Future<void> showServerDialog(BuildContext context) {
             await apply();
             final d = await services.ds.call('SYNO.AudioStation.Song', 'list', {'limit': '1', 'library': 'all'}, version: 3);
             result = 'OK: Audio Station ${d['total'] ?? 0} 曲';
+          } else if (source == MusicSource.filestation) {
+            await apply();
+            services.ds.reset(); // セッションの種類（File Station）を変えてログインし直す
+            final e = await services.ds.fsList(s.musicPath);
+            final dirs = e.where((x) => x.isDir).length;
+            result = 'OK: フォルダ $dirs / ファイル ${e.length - dirs}';
           } else {
             final dav = WebDavClient(url.text, user.text, pass.text);
             try {
@@ -75,7 +82,8 @@ Future<void> showServerDialog(BuildContext context) {
         setState(() => testing = false);
       }
 
-      final ds = source == MusicSource.dsaudio;
+      final ds = source != MusicSource.webdav; // DSM にログインする（DS audio・File Station）
+      final audio = source == MusicSource.dsaudio;
       return AlertDialog(
         title: const Text('接続先'),
         content: SingleChildScrollView(
@@ -108,8 +116,8 @@ Future<void> showServerDialog(BuildContext context) {
                               try {
                                 did = await Series.secret('nas.deviceToken');
                               } catch (_) {}
-                              // ハブの nas.url は DSM の URL なので DS audio で使う（WebDAV にも切り替えられる）
-                              source = MusicSource.dsaudio;
+                              // ハブの nas.url は DSM の URL なので DS audio か File Station で使う（WebDAV にも切り替えられる）
+                              if (source == MusicSource.webdav) source = MusicSource.dsaudio;
                               dsUrl.text = nasUrl;
                               if ((info['nas.user'] ?? '').isNotEmpty) user.text = info['nas.user']!;
                               if (pw.isNotEmpty) pass.text = pw;
@@ -128,6 +136,7 @@ Future<void> showServerDialog(BuildContext context) {
               segments: const [
                 ButtonSegment(value: MusicSource.webdav, label: Text('WebDAV')),
                 ButtonSegment(value: MusicSource.dsaudio, label: Text('DS audio')),
+                ButtonSegment(value: MusicSource.filestation, label: Text('File Station')),
               ],
               selected: {source},
               onSelectionChanged: (v) => setState(() {
@@ -137,9 +146,12 @@ Future<void> showServerDialog(BuildContext context) {
             ),
             const SizedBox(height: 4),
             Text(
-              ds
-                  ? 'Audio Station の API で曲の一覧と再生を行います（スキャン不要・タグは NAS 側のもの）。'
-                  : 'NAS のフォルダを WebDAV で直接スキャンします（Audio Station 不要）。',
+              switch (source) {
+                MusicSource.dsaudio => 'Audio Station の API で曲の一覧と再生を行います（スキャン不要・タグは NAS 側のもの）。',
+                MusicSource.filestation =>
+                  'NAS のフォルダを DSM の File Station で直接スキャンします（Movie・Book と同じ。WebDAV Server・Audio Station 不要）。',
+                MusicSource.webdav => 'NAS のフォルダを WebDAV で直接スキャンします（Audio Station 不要）。',
+              },
               style: const TextStyle(fontSize: 12),
             ),
             if (ds)
@@ -164,7 +176,7 @@ Future<void> showServerDialog(BuildContext context) {
               ),
             TextField(controller: user, decoration: const InputDecoration(labelText: 'ユーザー名')),
             TextField(controller: pass, obscureText: true, decoration: const InputDecoration(labelText: 'パスワード')),
-            if (!ds)
+            if (!audio)
               TextField(
                 controller: path,
                 decoration: const InputDecoration(labelText: 'Music フォルダ', hintText: '/music'),
@@ -178,7 +190,8 @@ Future<void> showServerDialog(BuildContext context) {
                   helperText: s.dsDid.isNotEmpty ? 'この端末は登録済み（コード不要）' : '1 回入れれば次から要りません',
                 ),
               ),
-              SwitchListTile(
+              if (audio)
+                SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('MP3 に変換して受け取る', style: TextStyle(fontSize: 14)),
                 subtitle: const Text('回線が細いとき・端末で再生できない形式のとき', style: TextStyle(fontSize: 11)),
@@ -190,8 +203,8 @@ Future<void> showServerDialog(BuildContext context) {
             if (testing) const LinearProgressIndicator(),
             if (result != null)
               Text(result!, style: TextStyle(color: result!.startsWith('OK') ? Colors.green : Colors.red)),
-            if (source != s.source || (ds && services.library.tracks.isNotEmpty && services.library.tracks.first.id.isEmpty) ||
-                (!ds && services.library.tracks.isNotEmpty && services.library.tracks.first.id.isNotEmpty))
+            if (source != s.source || (audio && services.library.tracks.isNotEmpty && services.library.tracks.first.id.isEmpty) ||
+                (!audio && services.library.tracks.isNotEmpty && services.library.tracks.first.id.isNotEmpty))
               const Padding(
                 padding: EdgeInsets.only(top: 8),
                 child: Text('接続方式を変えたら、ライブラリを更新してください。', style: TextStyle(fontSize: 12)),
@@ -232,7 +245,7 @@ Future<void> showObsidianDialog(BuildContext context) {
         const SizedBox(height: 8),
         const Text(
           '既定はシリーズの Theta Vault（共有フォルダ Obsidian の Theta Vault/Music）。ほかの Vault にするときだけ、共有フォルダから書いてください。'
-          'WebDAV のときは WebDAV で、DS audio のときは File Station で書き込みます。'
+          'WebDAV のときは WebDAV で、DS audio・File Station のときは File Station で書き込みます。'
           'Albums/ と Artists/ にノートを作成します。'
           'ノートに追記したメモは再書き出し時も保持されます。',
           style: TextStyle(fontSize: 12),
