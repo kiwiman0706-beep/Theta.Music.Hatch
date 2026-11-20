@@ -1,3 +1,3 @@
-# 音楽の整理・ジャケット・Obsidian Vault づくりを頼む文
+# 音楽の整理を頼む文（移りました）
 
-この依頼文は、ミュージックビデオと棚（`▶`）を足した [`PROMPT_MUSIC_ORGANIZE.md`](PROMPT_MUSIC_ORGANIZE.md) に移りました。そちらを使ってください。
+決まりは [`naming-convention.md`](naming-convention.md)、頼む文は [`PROMPT_LOCAL_ORGANIZE.md`](PROMPT_LOCAL_ORGANIZE.md) に移りました（Theta Movie Hatch と同じ形）。

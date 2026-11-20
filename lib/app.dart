@@ -60,7 +60,7 @@ class Services {
       settings,
       library,
       ds,
-      Scanner(settings, library, ds),
+      Scanner(settings, library, ds)..favorites = favorites,
       art,
       player,
       // DS audio のときは File Station、WebDAV のときは WebDAV で Vault に書く

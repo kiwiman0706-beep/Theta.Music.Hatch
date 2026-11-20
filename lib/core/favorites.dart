@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'library.dart';
+import 'move_log.dart';
 import 'models.dart';
 
 /// お気に入り（曲・アルバム・アーティスト）。端末内の favorites.json に保存。
@@ -35,6 +36,9 @@ class Favorites extends ChangeNotifier {
   final Set<String> _albums = {};
   final Set<String> _artists = {};
 
+  /// 当て終わった整理の記録（ファイル名）。同じ記録を二度当てない
+  final Set<String> _appliedLogs = {};
+
   /// テスト用に保存先を差し替え可能
   Directory? dirOverride;
 
@@ -51,6 +55,7 @@ class Favorites extends ChangeNotifier {
       _tracks.addAll((j['tracks'] as List? ?? const []).cast<String>());
       _albums.addAll((j['albums'] as List? ?? const []).cast<String>());
       _artists.addAll((j['artists'] as List? ?? const []).cast<String>());
+      _appliedLogs.addAll((j['moveLogs'] as List? ?? const []).cast<String>());
     } catch (e) {
       debugPrint('favorites load failed: $e');
     }
@@ -73,6 +78,7 @@ class Favorites extends ChangeNotifier {
         'tracks': _tracks.toList(),
         'albums': _albums.toList(),
         'artists': _artists.toList(),
+        'moveLogs': _appliedLogs.toList(),
       }));
       await tmp.rename(f.path);
     } catch (e) {
@@ -110,6 +116,25 @@ class Favorites extends ChangeNotifier {
     if (!added) set.remove(key);
     _save();
     return added;
+  }
+
+  bool appliedMoveLog(String name) => _appliedLogs.contains(name);
+
+  /// 整理の記録で、場所で覚えている曲のお気に入りを新しい場所に付け替える。付け替えた数を返す
+  Future<int> applyMoveLog(String name, List<(String, String)> moves) async {
+    var changed = 0;
+    for (final old in _tracks.toList()) {
+      final now = MoveLog.remap(old, moves);
+      if (now != old) {
+        _tracks
+          ..remove(old)
+          ..add(now);
+        changed++;
+      }
+    }
+    _appliedLogs.add(name);
+    await _save();
+    return changed;
   }
 
   int get count => tracks.length + albums.length + artists.length;

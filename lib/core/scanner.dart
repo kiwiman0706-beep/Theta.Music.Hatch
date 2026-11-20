@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import 'dsaudio.dart';
+import 'favorites.dart';
+import 'move_log.dart';
 import 'library.dart';
 import 'models.dart';
 import 'settings.dart';
@@ -81,6 +83,35 @@ class Scanner extends ChangeNotifier {
   String? error;
 
   void cancel() => _cancel = true;
+
+  /// 整理の記録で付け替えるお気に入り（Services で設定）
+  Favorites? favorites;
+
+  /// `<共有フォルダ>/_整理の記録/*.csv` のうち、まだ当てていない物を日時の順にお気に入りに当てる
+  Future<void> _applyMoveLogs(String? share, Future<List<String>> Function(String dir) names,
+      Future<String?> Function(String path) read) async {
+    final fav = favorites;
+    if (fav == null || share == null) return;
+    final dir = '$share/${MoveLog.dirName}';
+    List<String> files;
+    try {
+      files = [for (final n in await names(dir)) if (n.toLowerCase().endsWith('.csv')) n]..sort();
+    } catch (_) {
+      return; // 記録のフォルダが無い
+    }
+    var moved = 0;
+    for (final n in files) {
+      if (fav.appliedMoveLog(n)) continue;
+      try {
+        final text = await read('$dir/$n');
+        if (text == null) continue;
+        moved += await fav.applyMoveLog(n, MoveLog.parse(text));
+      } catch (e) {
+        debugPrint('move log $n: $e');
+      }
+    }
+    if (moved > 0) status = '$status（整理の記録でお気に入り $moved 曲を付け替え）';
+  }
 
   Future<void> scan({bool full = false}) async {
     if (running) return;
@@ -183,8 +214,10 @@ class Scanner extends ChangeNotifier {
         finalTracks.add(art == t.artPath ? t : Track.fromJson({...t.toJson(), 'ap': art}));
       }
 
-      await library.replace(finalTracks, root);
       status = '完了: ${finalTracks.length} 曲';
+      await _applyMoveLogs(MoveLog.shareOf(root), (d) async => [for (final e in await dav.list(d)) if (!e.isDir) e.name],
+          dav.getText);
+      await library.replace(finalTracks, root);
     } on _Cancelled {
       status = 'キャンセルしました';
     } catch (e) {
@@ -231,8 +264,9 @@ class Scanner extends ChangeNotifier {
         final t = _makeTrack(DavEntry(path, false, s.size, 0), root == '/' ? '' : root, tag);
         tracks.add(Track.fromJson({...t.toJson(), 'ap': 'ds:${s.id}', 'i': s.id, 'r': s.rating}));
       }
-      await library.replace(tracks, root);
       status = '完了: ${tracks.length} 曲（Audio Station）';
+      await _applyMoveLogs(MoveLog.shareOf(root), ds.listNames, ds.getText);
+      await library.replace(tracks, root);
     } on _Cancelled {
       status = 'キャンセルしました';
     } catch (e) {

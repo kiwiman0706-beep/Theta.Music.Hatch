@@ -270,6 +270,15 @@ class DsAudioClient implements NoteStore {
 
   // ------------------------------------------------ File Station（Obsidian 書き出し用）
 
+  /// フォルダの中のファイル名（整理の記録を探す）
+  Future<List<String>> listNames(String dir) async {
+    final r = await call('SYNO.FileStation.List', 'list', {'folder_path': dir, 'limit': '1000'});
+    return [
+      for (final f in ((r['files'] as List?) ?? const []).cast<Map>())
+        if (f['isdir'] != true) '${f['name']}'
+    ];
+  }
+
   @override
   Future<String?> getText(String path) async {
     await ensureLogin();

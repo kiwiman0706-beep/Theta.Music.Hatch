@@ -6,7 +6,7 @@
         flutter test test/ds_integration_test.dart
 
 本物の DSM の応答の形（SYNO.API.Info / Auth / AudioStation.Song / Stream / Cover /
-FileStation.Download / Upload / CreateFolder）に合わせているが、細部は実機と異なる場合がある。
+FileStation.Download / Upload / CreateFolder / List）に合わせているが、細部は実機と異なる場合がある。
 """
 import json
 import os
@@ -32,6 +32,7 @@ APIS = {
     'SYNO.FileStation.Download': {'path': 'entry.cgi', 'minVersion': 1, 'maxVersion': 2},
     'SYNO.FileStation.Upload': {'path': 'entry.cgi', 'minVersion': 1, 'maxVersion': 3},
     'SYNO.FileStation.CreateFolder': {'path': 'entry.cgi', 'minVersion': 1, 'maxVersion': 2},
+    'SYNO.FileStation.List': {'path': 'entry.cgi', 'minVersion': 1, 'maxVersion': 2},
 }
 
 SONGS = []
@@ -61,7 +62,9 @@ for root, _, files in os.walk(MUSIC):
 
 
 def vault_path(p):
-    # DSM の共有フォルダのパス（/vault/...）を手元のフォルダに
+    # DSM の共有フォルダのパス（/vault/...・/music/...）を手元のフォルダに
+    if p.startswith('/music'):
+        return os.path.join(MUSIC, p[len('/music'):].lstrip('/'))
     assert p.startswith('/vault')
     return os.path.join(VAULT, p[len('/vault'):].lstrip('/'))
 
@@ -174,6 +177,12 @@ class H(BaseHTTPRequestHandler):
                 return self.err(414)
             open(target, 'wb').write(data)
             return self.ok({})
+        if api == 'SYNO.FileStation.List':
+            d = vault_path(q['folder_path'])
+            if not os.path.isdir(d):
+                return self.err(408)
+            return self.ok({'files': [{'name': n, 'path': q['folder_path'] + '/' + n,
+                                       'isdir': os.path.isdir(os.path.join(d, n))} for n in sorted(os.listdir(d))]})
         if api == 'SYNO.FileStation.Download':
             p = vault_path(json.loads(q['path'])[0])
             if not os.path.exists(p):

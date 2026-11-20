@@ -24,6 +24,7 @@ Tailscale 経由で NAS の音楽を再生する Android 音楽プレーヤー�
   - 対応タグ: MP3 (ID3v1/v2.2–2.4, Shift_JIS 自動判定), FLAC (Vorbis Comment), M4A/AAC (iTunes タグ)
   - タグが無い場合はフォルダ構成 `Artist/Album/01 Title.ext`（`Disc 1/` 等も考慮）から推測
   - **棚**：Music のフォルダ直下に `▶` で始まるフォルダ（`▶邦楽` など）があれば、その中だけを読む（Theta Movie Hatch と同じ。棚が無ければ全部）。`_` で始まるフォルダと `▶ミュージックビデオ` は曲として読まない（Theta.Hatch.Series の `spec/THETA_LIBRARY_SPEC.md` §4・§4.1）
+  - **整理の記録**：`<共有フォルダ>/_整理の記録/<日時>.csv`（`元の場所,新しい場所,理由`。Theta Movie Hatch と同じ形）を読んで、場所で覚えている曲のお気に入りを新しい場所に付け替える（スキャンのたびに、まだ当てていない記録だけ）。整理の決まりは [`docs/naming-convention.md`](docs/naming-convention.md)
   - アート: 埋め込み画像（Range 取得）か `cover.jpg` / `folder.jpg` 等
   - 2 回目以降は**差分スキャン**（サイズ・更新日時が変わったファイルだけ読み直し）
 - **Obsidian 連携**: Library → Export to Obsidian で、NAS 上の Vault フォルダに Markdown を書き出し
@@ -100,7 +101,7 @@ Theta スキンの書体 Oswald・Share Tech Mono は SIL Open Font License（`d
 - ミュージックビデオ（PV・MV、ライブ映像の 1 曲分、YouTube の MV）は NAS の **`music` に置き、このアプリで視聴・管理する**。Theta Movie Hatch・8Tube では扱わない
 - 置き場所：`music/▶ミュージックビデオ/<アーティスト>/<アーティスト> - <曲名> (<年>).mp4`＋`.nfo`（Kodi・Jellyfin の musicvideo 形式）＋`-thumb.jpg`。アーティストの表記は曲のアルバムアーティストのフォルダと同じにし、アーティスト名と曲名で曲と結び付ける
 - 1.7.2 では曲として読まないだけ。**動画の再生・曲との結び付けは後の版**
-- 仮置きの `music/_ミュージックビデオ/`（8Tube から移した物）は、`docs/PROMPT_MUSIC_ORGANIZE.md` でローカルの Claude に整理してもらう
+- 仮置きの `music/_ミュージックビデオ/`（8Tube から移した物）は、ローカルの Claude に整理してもらう（決まり `docs/naming-convention.md`、頼む文 `docs/PROMPT_LOCAL_ORGANIZE.md`）
 
 ## シリーズとの連携
 
