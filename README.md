@@ -111,7 +111,7 @@ Theta スキンの書体 Oswald・Share Tech Mono は SIL Open Font License（`d
 - **ダウンロード・更新**：[Releases](https://github.com/kiwiman0706-beep/Theta.Music.Hatch/releases/latest)（`ThetaMusicHatch-<版>.apk`）。更新は Theta Home Hatch（または KidsHome）に頼む（設定の「更新する」。ハブが無ければ Releases を開く）。このアプリはインストールの権限を持たない
 - **共通設定**：同じ端末の Theta Home Hatch から、スキン（`ui.skin`）と NAS の接続先・パスワード・デバイストークンを受け取れる（接続設定の「Theta Home Hatch の NAS の設定を使う」。パスワードなどは選んだときだけ）
 - **Home の棚**：`content://app.thetahatch.music.theta/shelf` にお気に入りと最近再生したアルバムを出す（押すと再生）。共通鍵のアプリだけが読める
-- **Obsidian**：既定の書き出し先はシリーズの Theta Vault（NAS の `Obsidian/Theta Vault/Music/`）。一覧は `.base`
+- **Obsidian**：既定の書き出し先はシリーズの Theta Vault（NAS の `Obsidian/Theta Vault/Music/`）。**置き場所の決まりは `music/_Theta Vault/Music/`（ライブラリと同じ共有フォルダ。2026-11-20、`docs/naming-convention.md` §7）**。既定は後の版で変える。一覧は `.base`
 
 ## ビルド
 

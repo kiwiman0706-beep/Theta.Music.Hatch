@@ -2,7 +2,7 @@
 
 自分の PC（Windows か Mac）の Claude Code に、下のコードブロックの中を貼る。
 
-- **つないでおくドライブ：** NAS の共有フォルダ `music`（と、Vault を作るなら `Obsidian`）を、PC にネットワークドライブとしてつないでおく（Windows なら例えば `M:`・`O:`）。
+- **つないでおくドライブ：** NAS の共有フォルダ `music` を、PC にネットワークドライブとしてつないでおく（Windows なら例えば `M:`）。Vault のノートも `music/_Theta Vault/` に置く。
 - **頼み方：** 1 回で全部やろうとせず、**段階を 1 つ・棚を 1 つ・フォルダを 1 つ**ずつ頼む。ただし**段階 1（棚）だけは最初にまとめて**やる。
 - **`＜…＞` の 3 か所：** 毎回書き換える（ドライブ・段階・対象）。
 - **始める前に：** アプリを 1.8.0 以上にして、Library → Export to Obsidian を 1 回。
@@ -16,7 +16,7 @@ GitHub の kiwiman0706-beep/Theta.Music.Hatch（公開）の docs/naming-convent
 https://github.com/kiwiman0706-beep/Theta.Music.Hatch/blob/main/docs/naming-convention.md
 （読めなければ私に言ってください）
 
-- 共有フォルダは DSM のパスで /music、PC からは ＜例：M:\＞ で見えています（Vault は /Obsidian、PC から ＜例：O:\＞）
+- 共有フォルダは DSM のパスで /music、PC からは ＜例：M:\＞ で見えています（Vault のノートは /music/_Theta Vault/Music/）
 - 今回の段階：＜例：規則 §11 の 1「棚」＞ だけ。ほかの段階のことはしないでください
 - 今回の対象：＜例：M:\ の直下のフォルダ全部 → ▶邦楽・▶洋楽・▶サントラ へ＞
 
@@ -44,7 +44,7 @@ https://github.com/kiwiman0706-beep/Theta.Music.Hatch/blob/main/docs/naming-conv
 - 中身を変えない（曲も動画も、再エンコード・形式の変換をしない）。直してよいのは曲のタグだけで、それも変更案で私が OK した物だけ。動画のタグは書き換えない（情報は .nfo に）
 - 曲・動画と同じ名前の付属ファイル（.lrc・.cue・.nfo・-thumb.jpg・.info.json など）は一緒に動かす。_プレイリスト の .m3u8 があれば中のパスも直す
 - ▶ の付いていないフォルダは、対象に言われた物以外は触らない。@eaDir・#recycle は触らない
-- Vault の .obsidian/ や、ほかのアプリのフォルダ（Meishi/・Memo/ など）は触らない
+- Vault（/music/_Theta Vault/）の .obsidian/ や、/Obsidian の Theta Vault（Meishi/・Memo/ など）は触らない
 - 道具は Python 3.12 で（入っていない物は入れ方を教えてから）
 ```
 
@@ -56,5 +56,5 @@ https://github.com/kiwiman0706-beep/Theta.Music.Hatch/blob/main/docs/naming-conv
 | 2 | 規則 §11 の 2「タグ」 | `M:\▶邦楽\` の あ行のアーティスト |
 | 3 | 規則 §11 の 3「名前と場所」 | `M:\▶邦楽\` の あ行のアーティスト |
 | 4 | 規則 §11 の 4「ジャケット」 | `M:\▶邦楽\` 全部 |
-| 5 | 規則 §11 の 5「Vault のノート」 | `M:\▶邦楽\` 全部 → `O:\Theta Vault\Music\` |
+| 5 | 規則 §11 の 5「Vault のノート」 | `M:\▶邦楽\` 全部 → `M:\_Theta Vault\Music\` |
 | 6 | 規則 §11 の 6「ミュージックビデオ」 | `M:\_ミュージックビデオ\` の あ行 → `M:\▶ミュージックビデオ\` |
