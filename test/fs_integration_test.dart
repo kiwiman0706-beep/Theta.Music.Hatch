@@ -52,5 +52,5 @@ void main() {
     final full = await ds.fsBytes(t.path);
     expect(res.bodyBytes, full.sublist(10, 20));
     expect(await ds.fsRange(t.path, 10, 10), full.sublist(10, 20));
-  });
+  }, skip: url == null ? 'DS_URL not set' : false);
 }
